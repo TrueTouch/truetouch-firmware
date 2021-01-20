@@ -53,6 +53,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "nordic_ble.hpp"
+#include "nordic_pwm.hpp"
 #include "util.hpp"
 
 #include <app_timer.h>
@@ -193,6 +194,7 @@ int main(void)
     buttons_leds_init(&erase_bonds);
     power_management_init();
     ble::init();
+    pwm::init();
 
     // Start execution.
     printf("\r\nUART started.\r\n");

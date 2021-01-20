@@ -1,7 +1,7 @@
 /*
  * adafruit_feather.h - board definitions for Adafruit nRF52840 Feather.
  *
- * Copyright (c) 2020 Cameron Kluza
+ * Copyright (c) 2021 TrueTouch
  * Distributed under the MIT license (see LICENSE or https://opensource.org/licenses/MIT)
  */
 
@@ -11,9 +11,9 @@
 
 #define UNUSED_PIN              0
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Common BSP Definitions
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 #define LEDS_NUMBER             2
 
 #define LED_1                   _nRF_GPIO_PIN_MAP(0, 3)
@@ -54,12 +54,9 @@
 #define BSP_QSPI_IO2_PIN        _nRF_GPIO_PIN_MAP(0, 23)
 #define BSP_QSPI_IO3_PIN        _nRF_GPIO_PIN_MAP(0, 21)
 
-#define PMIC_SCL_PIN            UNUSED_PIN
-#define PMIC_SDA_PIN            UNUSED_PIN
-
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Adafruit Feather Definitions
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /* I2C Pin Definitions */
 #define FEATHER_SCL_PIN         _nRF_GPIO_PIN_MAP(0, 11)
@@ -96,3 +93,22 @@
 #define FEATHER_AREF_PIN        _nRF_GPIO_PIN_MAP(0, 31)
 #define NEOPIXEL_DI_PIN         _nRF_GPIO_PIN_MAP(0, 16)
 #define FEATHER_VDIV_PIN        _nRF_GPIO_PIN_MAP(0, 29) // Vbat divider
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// TrueTouch Definitions
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/* ERM PWM pins (1 per finger + palm) */
+#define ERM_THUMB               FEATHER_D5_PIN
+#define ERM_INDEX               FEATHER_D6_PIN
+#define ERM_MIDDLE              FEATHER_D9_PIN
+#define ERM_RING                FEATHER_D10_PIN
+#define ERM_PINKY               FEATHER_D11_PIN
+#define ERM_PALM                FEATHER_D12_PIN
+
+/* Solenoid GPIO pins (1 per finger) */
+#define SOLENOID_THUMB          FEATHER_A0_PIN
+#define SOLENOID_INDEX          FEATHER_A1_PIN
+#define SOLENOID_MIDDLE         FEATHER_A2_PIN
+#define SOLENOID_RING           FEATHER_A3_PIN
+#define SOLENOID_PINKY          FEATHER_A4_PIN
