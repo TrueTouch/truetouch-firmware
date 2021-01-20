@@ -36,8 +36,9 @@ constexpr std::uint8_t PWM0_PINS[NRF_PWM_CHANNEL_COUNT] {
 /** Pins used in the second PWM channel. */
 constexpr std::uint8_t PWM1_CHANNEL0 { ERM_PINKY };
 constexpr std::uint8_t PWM1_CHANNEL1 { ERM_PALM };
-constexpr std::uint8_t PWM1_CHANNEL2 { NRF_DRV_PWM_PIN_NOT_USED };
-constexpr std::uint8_t PWM1_CHANNEL3 { NRF_DRV_PWM_PIN_NOT_USED };
+/* The following two pins are used for testing. */
+constexpr std::uint8_t PWM1_CHANNEL2 { FEATHER_LED_CONN_PIN };
+constexpr std::uint8_t PWM1_CHANNEL3 { FEATHER_LED_D3_PIN };
 constexpr std::uint8_t PWM1_PINS[NRF_PWM_CHANNEL_COUNT] {
     PWM1_CHANNEL0,
     PWM1_CHANNEL1,
@@ -52,6 +53,5 @@ void init();
 void set_duty_cycle(std::uint8_t pin, std::uint16_t duty_cycle);
 
 /** Sets the duty cycle of the given ERM pin. */
-
 
 }  // namespace pwm

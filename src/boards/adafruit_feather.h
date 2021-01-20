@@ -16,7 +16,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 #define LEDS_NUMBER             2
 
-#define LED_1                   _nRF_GPIO_PIN_MAP(0, 3)
+#define LED_1                   _nRF_GPIO_PIN_MAP(1, 15)
 #define LED_2                   _nRF_GPIO_PIN_MAP(1, 10)
 #define LED_START               LED_1
 #define LED_STOP                LED_2
@@ -93,6 +93,13 @@
 #define FEATHER_AREF_PIN        _nRF_GPIO_PIN_MAP(0, 31)
 #define NEOPIXEL_DI_PIN         _nRF_GPIO_PIN_MAP(0, 16)
 #define FEATHER_VDIV_PIN        _nRF_GPIO_PIN_MAP(0, 29) // Vbat divider
+
+/* LEDs */
+#define FEATHER_LED_D3_PIN      LED_1
+#define FEATHER_LED_CONN_PIN    LED_2
+
+/* Buttons */
+#define FEATHER_USER_BTN_PIN    BUTTON_1
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // TrueTouch Definitions

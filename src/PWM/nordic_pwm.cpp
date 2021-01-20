@@ -150,6 +150,12 @@ static std::uint16_t *get_duty_cycle(std::uint8_t pin)
         case PWM1_CHANNEL1:
             return &m_pwm1_seq_values.channel_1;
 
+        case PWM1_CHANNEL2:
+            return &m_pwm1_seq_values.channel_2;
+
+        case PWM1_CHANNEL3:
+            return &m_pwm1_seq_values.channel_3;
+
         default:
            return nullptr;
     }
