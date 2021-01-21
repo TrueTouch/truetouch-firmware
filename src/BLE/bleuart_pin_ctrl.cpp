@@ -8,36 +8,27 @@
 
 #include "bleuart_pin_ctrl.h"
 
-using namespace ble_uart_pin_ctrl;
+#include "nordic_pwm.hpp"
 
-/* Enable debugging log statements */
-#define DEBUG
+#include <nrf_log.h>
+#include <nrf_gpio.h>
 
-#ifdef DEBUG
-#   define DBG_LOG(...) Serial.print(__VA_ARGS__)
-#   define DBG_LOG_LINE(...) Serial.println(__VA_ARGS__)
-#else
-#   define DBG_LOG(...) 
-#   define DBG_LOG_LINE(...)
-#endif // DEBUG
+#include <cstring>
 
-PinCtrl::PinCtrl(BLEUart *uart) : _uart{uart},
-                                  _pins_to_pulse{0},
-                                  _pulse_dur_ms{0},
-                                  _pulse_start_ms{0} {}
+namespace ble_uart_pin_ctrl {
 
 void PinCtrl::service() {
     /* Always service pin pulsing if it's ongoing */
     service_gpio_pulse();
-  
+
     /* Do nothing if there's no data */
-    if (_uart->available() <= 0) {
+    if (_buffer_cnt == 0) {
         return;
     }
 
     /* First byte is command, peek that */
-    const Command command = static_cast<Command>(_uart->peek());
-    
+    const Command command = static_cast<Command>(_buffer[0]);
+
     /* Perform command-specific processing (break if all data bytes aren't recieved yet) */
     switch (command) {
         case Command::GPIO_CONFIGURE: {
@@ -69,9 +60,7 @@ void PinCtrl::service() {
 }
 
 void PinCtrl::handle_gpio_configure() {
-    const unsigned int number_of_bytes = static_cast<unsigned int>(_uart->available());
-
-    if (number_of_bytes < sizeof(GpioConfigure)) {
+    if (_buffer_cnt < sizeof(GpioConfigure)) {
         return; // missing bytes
     }
 
@@ -80,29 +69,25 @@ void PinCtrl::handle_gpio_configure() {
     // fix endianness for multi-byte pieces of data
     params.gpio_port = byte_swap32(params.gpio_port);
     params.gpio_bitset = byte_swap32(params.gpio_bitset);
-    
-    DBG_LOG("GPIO_CONFIGURE: ");
-    DBG_LOG(params.gpio_bitset, HEX);
-    DBG_LOG(" ");
-    DBG_LOG_LINE(static_cast<int>(params.gpio_direction));
+
+    NRF_LOG_DEBUG("GPIO_CONFIGURE: %x %d", params.gpio_bitset, params.gpio_direction);
 
     /* Go through each bit and configure appropriate pins */
-    for (int pin = 0; pin < 32; ++pin) {
-        if (is_set(params.gpio_bitset, pin)) {
+    for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
+        if (is_set(params.gpio_bitset, pin_idx)) {
+            auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
             if (params.gpio_direction == GpioDirection::DIR_INPUT) {
-                pinMode(pin, INPUT);
+                nrf_gpio_cfg_input(pin, NRF_GPIO_PIN_NOPULL);
             } else {
-                pinMode(pin, OUTPUT);
-                digitalWrite(pin, LOW);
+                nrf_gpio_cfg_output(pin);
+                nrf_gpio_pin_clear(pin);
             }
         }
     }
 }
 
 void PinCtrl::handle_gpio_write() {
-    const unsigned int number_of_bytes = static_cast<unsigned int>(_uart->available());
-
-    if (number_of_bytes < sizeof(GpioWrite)) {
+    if (_buffer_cnt < sizeof(GpioWrite)) {
         return; // missing bytes
     }
 
@@ -111,22 +96,21 @@ void PinCtrl::handle_gpio_write() {
     // fix endianness for multi-byte pieces of data
     params.gpio_port = byte_swap32(params.gpio_port);
     params.gpio_bitset = byte_swap32(params.gpio_bitset);
-    
-    DBG_LOG("GPIO_WRITE: ");
-    DBG_LOG_LINE(params.gpio_bitset, HEX);
+
+    NRF_LOG_DEBUG("GPIO_WRITE: %x", params.gpio_bitset);
 
     /* Go through each bit and set appropriate pins */
-    for (int pin = 0; pin < 32; ++pin) {
-        if (is_set(params.gpio_bitset, pin)) {
-            digitalWrite(pin, params.output == GpioOutput::OUT_HIGH); // true if high, false if low
+    for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
+        if (is_set(params.gpio_bitset, pin_idx)) {
+            auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
+            nrf_gpio_pin_write(pin, params.output == GpioOutput::OUT_HIGH);
         }
     }
 }
 
+#if 0 // TODO CMK (1/21/21): reimplement w/ timers?
 void PinCtrl::handle_gpio_pulse() {
-    const unsigned int number_of_bytes = static_cast<unsigned int>(_uart->available());
-
-    if (number_of_bytes < sizeof(GpioPulse)) {
+    if (_buffer_cnt < sizeof(GpioPulse)) {
         return; // missing bytes
     }
 
@@ -136,11 +120,8 @@ void PinCtrl::handle_gpio_pulse() {
     params.gpio_port = byte_swap32(params.gpio_port);
     params.gpio_bitset = byte_swap32(params.gpio_bitset);
     params.duration_ms = byte_swap32(params.duration_ms);
-    
-    DBG_LOG("GPIO_PULSE: ");
-    DBG_LOG(params.gpio_bitset, HEX);
-    DBG_LOG(" ");
-    DBG_LOG_LINE(params.duration_ms);
+
+    NRF_LOG_DEBUG("GPIO_PULSE: %x %d", params.gpio_bitset, params.duration_ms);
 
     /* Store data for use by pin pulsing routine */
     _pins_to_pulse = params.gpio_bitset;
@@ -149,31 +130,29 @@ void PinCtrl::handle_gpio_pulse() {
     if (!_pins_to_pulse) { // nothing to do
         return;
     }
-    
+
     /* Start the first pulse (set the pin high and record the start time) */
     int pin = PinCtrl::get_highest_bit(_pins_to_pulse);
     if (pin < 0) { // note - should never happen
-        Serial.println("!!! Pulse starting with no pin set");
-        return; 
+        NRF_LOG_WARN("Pulse starting with no pin set");
+        return;
     }
 
-    DBG_LOG("Pulsing pin ");
-    DBG_LOG(pin);
-    DBG_LOG(" for ");
-    DBG_LOG_LINE(_pulse_dur_ms);
+    NRF_LOG_DEBUG("Pulsing pin %d for %d", pin, _pulse_dur_ms);
 
     digitalWrite(pin, HIGH);
     _pulse_start_ms = millis();
 }
+#else
+void PinCtrl::handle_gpio_pulse() {}
+#endif
 
 void PinCtrl::handle_gpio_query() {
-    Serial.println("GPIO QUERY: TODO");
+    NRF_LOG_WARNING("GPIO QUERY: TODO");
 }
 
 void PinCtrl::handle_pwm_set() {
-    const unsigned int number_of_bytes = static_cast<unsigned int>(_uart->available());
-
-    if (number_of_bytes < sizeof(PwmSet)) {
+    if (_buffer_cnt < sizeof(PwmSet)) {
         return; // missing bytes
     }
 
@@ -183,23 +162,23 @@ void PinCtrl::handle_pwm_set() {
     params.gpio_port = byte_swap32(params.gpio_port);
     params.gpio_bitset = byte_swap32(params.gpio_bitset);
 
-    DBG_LOG("PWM_SET: ");
-    DBG_LOG(params.gpio_bitset, HEX);
-    DBG_LOG(" ");
-    DBG_LOG_LINE(static_cast<int>(params.intensity));
+    NRF_LOG_DEBUG("PWM_SET: %x %d", params.gpio_bitset, params.intensity);
 
     /* Go through each bit and set PWM on appropriate pins */
-    for (int pin = 0; pin < 32; ++pin) {
-        if (is_set(params.gpio_bitset, pin)) {
-            analogWrite(pin, params.intensity);
+    for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
+        if (is_set(params.gpio_bitset, pin_idx)) {
+            auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
+            // TODO CMK (1/21/21): this will be the wrong duty cycle... need to adjust/map some things
+            pwm::set_duty_cycle(pin, params.intensity);
         }
     }
 }
 
 void PinCtrl::handle_query_state() {
-    Serial.println("QUERY STATE: TODO");
+    NRF_LOG_WARNING("QUERY STATE: TODO");
 }
 
+#if 0 // TODO CMK (1/21/21): implement with timers?
 void PinCtrl::service_gpio_pulse() {
     /* Do nothing if no pulsing is ongoing */
     if (!_pins_to_pulse) {
@@ -217,7 +196,7 @@ void PinCtrl::service_gpio_pulse() {
         Serial.println("!!! Pulse active with no pin set");
         return;
     }
-    
+
     digitalWrite(pin, LOW);
     PinCtrl::clear_highest_bit(_pins_to_pulse);
 
@@ -243,17 +222,20 @@ void PinCtrl::service_gpio_pulse() {
     digitalWrite(pin, HIGH);
     _pulse_start_ms = millis();
 }
+#else
+void PinCtrl::service_gpio_pulse() {}
+#endif
 
-/** Helper to parse data from the UART buffer */
-template <typename T> 
-T PinCtrl::parse_bytes() {
-    /* Read into a byte buffer */
-    std::uint8_t read_buffer[sizeof(T)] = {};
-    _uart->read(read_buffer, sizeof(read_buffer));
-    
-    /* Transform that byte buffer into the appropriate struct */
-    T parameters = {};
-    memcpy(&parameters, read_buffer, sizeof(parameters));
-    
-    return parameters;
+void PinCtrl::callback(const std::uint8_t *data, std::uint16_t length)
+{
+    std::size_t remaining_length = BUFFER_SIZE - _buffer_cnt;
+    if (length > remaining_length) { // truncate... should never happen though
+       NRF_LOG_WARNING("Truncating incoming BLE data from %d to %d", length, remaining_length);
+       length = remaining_length;
+    }
+
+    std::memcpy(&_buffer[_buffer_cnt], data, length);
+    _buffer_cnt += length;
 }
+
+}  // namespace ble_uart_pin_ctrl

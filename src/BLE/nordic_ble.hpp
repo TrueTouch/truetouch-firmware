@@ -57,12 +57,17 @@ constexpr std::uint32_t NEXT_CONN_PARAMS_UPDATE_DELAY  { APP_TIMER_TICKS(30000) 
 /** Number of attempts before giving up the connection parameter negotiation. */
 constexpr std::uint32_t MAX_CONN_PARAMS_UPDATE_COUNT { 3 };
 
-/**< Application's BLE observer priority. You shouldn't need to modify this value. */
+/** Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_OBSERVER_PRIO 3
+
+/** Maximum number of callbacks that can be registered. */
+constexpr std::uint32_t CALLBACK_MAX { 4 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+using UartCallback = void (*)(const std::uint8_t *data, std::uint16_t length);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
@@ -98,5 +103,11 @@ std::uint16_t max_data_length();
  * Sends data over the NUS service.
  */
 void send(std::uint8_t *data, std::uint16_t length);
+
+/**
+ * Register callback for when data is written to this device. Callbacks should copy the data
+ * somewhere else for processing.
+ */
+void register_callback(UartCallback callback);
 
 }  // namespace ble

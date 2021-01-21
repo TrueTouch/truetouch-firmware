@@ -8,9 +8,10 @@
 
 #pragma once
 
-#include <cstdint>
+#include <app_error.h>
 
-#include <bluefruit.h>
+#include <cstdint>
+#include <cstddef>
 
 namespace ble_uart_pin_ctrl {
 
@@ -99,13 +100,16 @@ struct __attribute__((packed)) QueryState {
 };
 
 class PinCtrl {
-private:
-    BLEUart *_uart;                 /*!< Pointer to BLE UART instance */
-    std::uint32_t _pins_to_pulse;   /*!< Bit mask of pins to pulse */
-    std::uint32_t _pulse_dur_ms;    /*!< Current pulse activity delay in ms */
-    std::uint32_t _pulse_start_ms;  /*!< Time the current pulse started in ms */
+public:
+    /** Size of the UART buffer. */
+    static constexpr std::size_t BUFFER_SIZE { 256 };
 
-    /* Functions to handle commands */
+private:
+    /** Buffer used to read data recieved from BLE UART. */
+    std::uint8_t _buffer[BUFFER_SIZE];
+    volatile std::size_t _buffer_cnt;
+
+    /** Functions to handle commands */
     void handle_gpio_configure();
     void handle_gpio_write();
     void handle_gpio_pulse();
@@ -113,16 +117,32 @@ private:
     void handle_pwm_set();
     void handle_query_state();
 
-    /* Service any ongoing pulse command */
+    /** Service any ongoing pulse command */
     void service_gpio_pulse();
 
-    /* Copy bytes from the BLE UART byte buffer into the type T */
+    /** Copy bytes from the BLE UART byte buffer into the type T */
     template <typename T>
-    T parse_bytes();
+    T parse_bytes() {
+        if (_buffer_cnt < sizeof(T)) {
+            /** Uh-oh... */
+            APP_ERROR_HANDLER(0);
+        } else {
+            T ret;
+            memcpy(&ret, _buffer, sizeof(T));
+            return ret;
+        }
+    }
 
 public:
-    PinCtrl(BLEUart *uart);
+    PinCtrl() {}
+    virtual ~PinCtrl() {}
+
+    /** Services any pending data read by the  */
     void service();
+
+    /** Callback to handle incoming UART data. */
+    // TODO: add contexts to callbacks
+    static void callback(const std::uint8_t *data, std::uint16_t length);
 
     /* Misc utils/helpers */
 

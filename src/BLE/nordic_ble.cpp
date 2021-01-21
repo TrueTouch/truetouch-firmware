@@ -20,6 +20,8 @@
 #include <nrf_log.h>
 #include <nrf_sdh.h>
 
+#include <cstddef>
+
 namespace ble {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,16 +39,20 @@ NRF_BLE_QWR_DEF(m_qwr);
 /** Advertising module instance. */
 BLE_ADVERTISING_DEF(m_advertising);
 
-/**< Handle of the current connection. */
+/** Handle of the current connection. */
 static std::uint16_t m_conn_handle { BLE_CONN_HANDLE_INVALID };
 
-/**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
+/** Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static std::uint16_t m_ble_nus_max_data_len { BLE_GATT_ATT_MTU_DEFAULT - 3 };
 
-/**< Universally unique service identifier. */
+/** Universally unique service identifier. */
 static ble_uuid_t m_adv_uuids[] {
     {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
 };
+
+/** BLE write event callbacks. */
+std::uint32_t m_callback_cnt {};
+UartCallback m_callbacks[CALLBACK_MAX] {};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private function prototypes
@@ -198,6 +204,14 @@ void send(std::uint8_t *data, std::uint16_t length)
     } while (err_code == NRF_ERROR_RESOURCES);
 }
 
+void register_callback(UartCallback callback)
+{
+    if (m_callback_cnt < CALLBACK_MAX) {
+       m_callbacks[m_callback_cnt] = callback;
+       ++m_callback_cnt;
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private function implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -328,6 +342,10 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
 
         NRF_LOG_DEBUG("Received data from BLE NUS. Writing data on UART.");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+
+        for (std::size_t i = 0; i < m_callback_cnt; ++i) {
+            m_callbacks[i](p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+        }
     }
 }
 
