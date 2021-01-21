@@ -60,6 +60,7 @@
 #include <bsp_btn_ble.h>
 #include <nordic_common.h>
 #include <nrf.h>
+#include <nrf_gpio.h>
 #include <nrf_pwr_mgmt.h>
 
 #include <nrf_log.h>
@@ -78,6 +79,15 @@ constexpr std::uint32_t UART_TX_BUF_SIZE { 256 };
 
 /**< UART RX buffer size. */
 constexpr std::uint32_t UART_RX_BUF_SIZE { 256 };
+
+constexpr std::uint32_t SOLENOID_PIN_CNT { 5 };
+constexpr std::uint8_t SOLENOID_PINS[SOLENOID_PIN_CNT] {
+    SOLENOID_THUMB,
+    SOLENOID_INDEX,
+    SOLENOID_MIDDLE,
+    SOLENOID_RING,
+    SOLENOID_PINKY,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
@@ -101,7 +111,7 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 
 /**@brief Function for initializing the timer module.
  */
-static void timers_init(void)
+static void timers_init()
 {
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
@@ -152,7 +162,7 @@ static void buttons_leds_init(bool * p_erase_bonds)
 
 /**@brief Function for initializing the nrf log module.
  */
-static void log_init(void)
+static void log_init()
 {
     ret_code_t err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
@@ -162,7 +172,7 @@ static void log_init(void)
 
 /**@brief Function for initializing power management.
  */
-static void power_management_init(void)
+static void power_management_init()
 {
     ret_code_t err_code;
     err_code = nrf_pwr_mgmt_init();
@@ -173,13 +183,29 @@ static void power_management_init(void)
  *
  * @details If there is no pending log operation, then sleep until next the next event occurs.
  */
-static void idle_state_handle(void)
+static void idle_state_handle()
 {
     if (NRF_LOG_PROCESS() == false)
     {
         nrf_pwr_mgmt_run();
     }
 }
+
+/**@brief Initialize GPIO outputs to solenoids.
+ */
+static void init_solenoid_gpio()
+{
+    for (std::size_t i = 0; i < SOLENOID_PIN_CNT; ++i) {
+        nrf_gpio_cfg_output(SOLENOID_PINS[i]);
+    }
+}
+
+/* NOTE: following functions available for manipulating GPIO:
+ * nrf_gpio_pin_set(uint32_t pin_number);
+ * nrf_gpio_pin_clear(uint32_t pin_number);
+ * nrf_gpio_pin_toggle(uint32_t pin_number);
+ * nrf_gpio_pin_write(uint32_t pin_number, uint32_t value);
+ */
 
 /**@brief Application main function.
  */
@@ -191,6 +217,7 @@ int main(void)
     log_init();
     timers_init();
     buttons_leds_init(&erase_bonds);
+    init_solenoid_gpio();
     power_management_init();
     ble::init();
 
