@@ -9,6 +9,7 @@
 #include "bleuart_pin_ctrl.h"
 
 #include "nordic_pwm.hpp"
+#include "util.hpp"
 
 #include <nrf_log.h>
 #include <nrf_gpio.h>
@@ -67,14 +68,14 @@ void PinCtrl::handle_gpio_configure() {
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<GpioConfigure>();
     // fix endianness for multi-byte pieces of data
-    params.gpio_port = byte_swap32(params.gpio_port);
-    params.gpio_bitset = byte_swap32(params.gpio_bitset);
+    params.gpio_port = util::byte_swap32(params.gpio_port);
+    params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
 
     NRF_LOG_DEBUG("GPIO_CONFIGURE: %x %d", params.gpio_bitset, params.gpio_direction);
 
     /* Go through each bit and configure appropriate pins */
     for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
-        if (is_set(params.gpio_bitset, pin_idx)) {
+        if (util::is_set(params.gpio_bitset, pin_idx)) {
             auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
             if (params.gpio_direction == GpioDirection::DIR_INPUT) {
                 nrf_gpio_cfg_input(pin, NRF_GPIO_PIN_NOPULL);
@@ -94,14 +95,14 @@ void PinCtrl::handle_gpio_write() {
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<GpioWrite>();
     // fix endianness for multi-byte pieces of data
-    params.gpio_port = byte_swap32(params.gpio_port);
-    params.gpio_bitset = byte_swap32(params.gpio_bitset);
+    params.gpio_port = util::byte_swap32(params.gpio_port);
+    params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
 
     NRF_LOG_DEBUG("GPIO_WRITE: %x", params.gpio_bitset);
 
     /* Go through each bit and set appropriate pins */
     for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
-        if (is_set(params.gpio_bitset, pin_idx)) {
+        if (util::is_set(params.gpio_bitset, pin_idx)) {
             auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
             nrf_gpio_pin_write(pin, params.output == GpioOutput::OUT_HIGH);
         }
@@ -159,14 +160,14 @@ void PinCtrl::handle_pwm_set() {
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<PwmSet>();
     // fix endianness for multi-byte pieces of data
-    params.gpio_port = byte_swap32(params.gpio_port);
-    params.gpio_bitset = byte_swap32(params.gpio_bitset);
+    params.gpio_port = util::byte_swap32(params.gpio_port);
+    params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
 
     NRF_LOG_DEBUG("PWM_SET: %x %d", params.gpio_bitset, params.intensity);
 
     /* Go through each bit and set PWM on appropriate pins */
     for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
-        if (is_set(params.gpio_bitset, pin_idx)) {
+        if (util::is_set(params.gpio_bitset, pin_idx)) {
             auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
             // TODO CMK (1/21/21): this will be the wrong duty cycle... need to adjust/map some things
             pwm::set_duty_cycle(pin, params.intensity);
@@ -226,16 +227,18 @@ void PinCtrl::service_gpio_pulse() {
 void PinCtrl::service_gpio_pulse() {}
 #endif
 
-void PinCtrl::callback(const std::uint8_t *data, std::uint16_t length)
+void PinCtrl::callback(void *context, const std::uint8_t *data, std::uint16_t length)
 {
-    std::size_t remaining_length = BUFFER_SIZE - _buffer_cnt;
+    auto *_this = reinterpret_cast<PinCtrl *>(context);
+
+    std::size_t remaining_length = BUFFER_SIZE - _this->_buffer_cnt;
     if (length > remaining_length) { // truncate... should never happen though
        NRF_LOG_WARNING("Truncating incoming BLE data from %d to %d", length, remaining_length);
        length = remaining_length;
     }
 
-    std::memcpy(&_buffer[_buffer_cnt], data, length);
-    _buffer_cnt += length;
+    std::memcpy(&_this->_buffer[_this->_buffer_cnt], data, length);
+    _this->_buffer_cnt += length;
 }
 
 }  // namespace ble_uart_pin_ctrl

@@ -8,10 +8,13 @@
 
 #pragma once
 
+#include "nordic_ble.hpp"
+
 #include <app_error.h>
 
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
 
 namespace ble_uart_pin_ctrl {
 
@@ -128,13 +131,18 @@ private:
             APP_ERROR_HANDLER(0);
         } else {
             T ret;
-            memcpy(&ret, _buffer, sizeof(T));
+            std::memcpy(&ret, _buffer, sizeof(T));
             return ret;
         }
+
+        // subdue the return type warning (APP_ERROR_HANDLER will not return)
+        return T{};
     }
 
 public:
-    PinCtrl() {}
+    PinCtrl() {
+        ble::register_callback(this, callback);
+    }
     virtual ~PinCtrl() {}
 
     /** Services any pending data read by the  */
@@ -142,40 +150,7 @@ public:
 
     /** Callback to handle incoming UART data. */
     // TODO: add contexts to callbacks
-    static void callback(const std::uint8_t *data, std::uint16_t length);
-
-    /* Misc utils/helpers */
-
-    // fix endianness (network to host)
-    static std::uint32_t byte_swap32(std::uint32_t input) {
-        return __builtin_bswap32(input);
-    }
-
-    // check if bit n is set in the mask
-    static bool is_set(std::uint32_t mask, unsigned int n) {
-        if (n > 31) {
-            return false;
-        }
-        return mask & (1UL << n);
-    }
-
-    // return the bit position of the highest set bit (-1 if no bits are set)
-    static int get_highest_bit(std::uint32_t mask) {
-        for (int i = 31; i >= 0; --i) {
-            if (mask & (1UL << i)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    // clears the bit position of the highest set bit
-    static void clear_highest_bit(std::uint32_t &mask) {
-        int n = get_highest_bit(mask);
-        if (n >= 0) {
-            mask &= ~(1UL << n);
-        }
-    }
+    static void callback(void *context, const std::uint8_t *data, std::uint16_t length);
 };
 
 }  // namespace ble_uart_pin_ctrl

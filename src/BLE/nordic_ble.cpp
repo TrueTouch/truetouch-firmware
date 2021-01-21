@@ -50,9 +50,10 @@ static ble_uuid_t m_adv_uuids[] {
     {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
 };
 
-/** BLE write event callbacks. */
+/** BLE write event callbacks and contexts. */
 std::uint32_t m_callback_cnt {};
 UartCallback m_callbacks[CALLBACK_MAX] {};
+void *m_contexts[CALLBACK_MAX] {};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private function prototypes
@@ -204,10 +205,11 @@ void send(std::uint8_t *data, std::uint16_t length)
     } while (err_code == NRF_ERROR_RESOURCES);
 }
 
-void register_callback(UartCallback callback)
+void register_callback(void *context, UartCallback callback)
 {
     if (m_callback_cnt < CALLBACK_MAX) {
        m_callbacks[m_callback_cnt] = callback;
+       m_contexts[m_callback_cnt] = context;
        ++m_callback_cnt;
     }
 }
@@ -344,7 +346,7 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
 
         for (std::size_t i = 0; i < m_callback_cnt; ++i) {
-            m_callbacks[i](p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+            m_callbacks[i](m_contexts[i], p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
         }
     }
 }

@@ -67,7 +67,7 @@ constexpr std::uint32_t CALLBACK_MAX { 4 };
 // Types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-using UartCallback = void (*)(const std::uint8_t *data, std::uint16_t length);
+using UartCallback = void (*)(void *context, const std::uint8_t *data, std::uint16_t length);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
@@ -108,6 +108,6 @@ void send(std::uint8_t *data, std::uint16_t length);
  * Register callback for when data is written to this device. Callbacks should copy the data
  * somewhere else for processing.
  */
-void register_callback(UartCallback callback);
+void register_callback(void *context, UartCallback callback);
 
 }  // namespace ble
