@@ -96,7 +96,7 @@
         <file file_name="../src/BLE/nordic_ble.cpp" />
         <file file_name="../src/BLE/nordic_ble.hpp" />
         <file file_name="../src/BLE/bleuart_pin_ctrl.cpp" />
-        <file file_name="../src/BLE/bleuart_pin_ctrl.h" />
+        <file file_name="../src/BLE/bleuart_pin_ctrl.hpp" />
       </folder>
       <file file_name="../src/util.cpp" />
       <file file_name="../src/util.hpp" />

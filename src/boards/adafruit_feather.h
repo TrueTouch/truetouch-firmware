@@ -112,6 +112,8 @@
 #define ERM_RING                FEATHER_D10_PIN
 #define ERM_PINKY               FEATHER_D11_PIN
 #define ERM_PALM                FEATHER_D12_PIN
+#define ERM_COUNT               6
+
 
 /* Solenoid GPIO pins (1 per finger) */
 #define SOLENOID_THUMB          FEATHER_A0_PIN
@@ -119,3 +121,4 @@
 #define SOLENOID_MIDDLE         FEATHER_A2_PIN
 #define SOLENOID_RING           FEATHER_A3_PIN
 #define SOLENOID_PINKY          FEATHER_A4_PIN
+#define SOLENOID_COUNT          5

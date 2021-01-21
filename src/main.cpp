@@ -52,6 +52,7 @@
 // Includes
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "bleuart_pin_ctrl.hpp"
 #include "nordic_ble.hpp"
 #include "nordic_pwm.hpp"
 #include "util.hpp"
@@ -69,6 +70,8 @@
 #include <nrf_log_default_backends.h>
 
 #include <cstddef>
+
+using namespace ble_uart_pin_ctrl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -269,6 +272,8 @@ int main(void)
     ble::init();
     pwm::init();
 
+    PinCtrl pin_ctrl {};
+
     // Start execution.
     printf("\r\nUART started.\r\n");
     NRF_LOG_INFO("Debug logging over UART started.");
@@ -281,6 +286,7 @@ int main(void)
     for (;;)
     {
         idle_state_handle();
+        pin_ctrl.service();
     }
 }
 

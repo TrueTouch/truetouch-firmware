@@ -6,7 +6,7 @@
  *      - Get status
  */
 
-#include "bleuart_pin_ctrl.h"
+#include "bleuart_pin_ctrl.hpp"
 
 #include "nordic_pwm.hpp"
 #include "util.hpp"
@@ -18,10 +18,9 @@
 
 namespace ble_uart_pin_ctrl {
 
-void PinCtrl::service() {
-    /* Always service pin pulsing if it's ongoing */
-    service_gpio_pulse();
+APP_TIMER_DEF(MY_TEST_TIMER);
 
+void PinCtrl::service() {
     /* Do nothing if there's no data */
     if (_buffer_cnt == 0) {
         return;
@@ -109,7 +108,7 @@ void PinCtrl::handle_gpio_write() {
     }
 }
 
-#if 0 // TODO CMK (1/21/21): reimplement w/ timers?
+// APP_TIMER_TICKS
 void PinCtrl::handle_gpio_pulse() {
     if (_buffer_cnt < sizeof(GpioPulse)) {
         return; // missing bytes
@@ -118,35 +117,30 @@ void PinCtrl::handle_gpio_pulse() {
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<GpioPulse>();
     // fix endianness for multi-byte pieces of data
-    params.gpio_port = byte_swap32(params.gpio_port);
-    params.gpio_bitset = byte_swap32(params.gpio_bitset);
-    params.duration_ms = byte_swap32(params.duration_ms);
+    params.gpio_port = util::byte_swap32(params.gpio_port);
+    params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
+    params.duration_ms = util::byte_swap32(params.duration_ms);
 
     NRF_LOG_DEBUG("GPIO_PULSE: %x %d", params.gpio_bitset, params.duration_ms);
 
+    /* Store which pins to pulse */
+    for (int pin_idx = 0; pin_idx < 32 && _pulse_cnt < SOLENOID_COUNT; ++pin_idx) {
+        if (util::is_set(params.gpio_bitset, pin_idx)) {
+            auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
+            _pulse_pins[_pulse_cnt] = pin;
+            ++_pulse_cnt;
+        }
+    }
+
     /* Store data for use by pin pulsing routine */
-    _pins_to_pulse = params.gpio_bitset;
     _pulse_dur_ms = params.duration_ms;
 
-    if (!_pins_to_pulse) { // nothing to do
-        return;
-    }
-
-    /* Start the first pulse (set the pin high and record the start time) */
-    int pin = PinCtrl::get_highest_bit(_pins_to_pulse);
-    if (pin < 0) { // note - should never happen
-        NRF_LOG_WARN("Pulse starting with no pin set");
-        return;
-    }
-
+    /* Set the first pin high and start the timer. */
+    auto pin = _pulse_pins[0];
     NRF_LOG_DEBUG("Pulsing pin %d for %d", pin, _pulse_dur_ms);
-
-    digitalWrite(pin, HIGH);
-    _pulse_start_ms = millis();
+    nrf_gpio_pin_set(pin);
+    APP_ERROR_CHECK(app_timer_start(_timer, APP_TIMER_TICKS(_pulse_dur_ms), this));
 }
-#else
-void PinCtrl::handle_gpio_pulse() {}
-#endif
 
 void PinCtrl::handle_gpio_query() {
     NRF_LOG_WARNING("GPIO QUERY: TODO");
@@ -179,55 +173,7 @@ void PinCtrl::handle_query_state() {
     NRF_LOG_WARNING("QUERY STATE: TODO");
 }
 
-#if 0 // TODO CMK (1/21/21): implement with timers?
-void PinCtrl::service_gpio_pulse() {
-    /* Do nothing if no pulsing is ongoing */
-    if (!_pins_to_pulse) {
-        return;
-    }
-
-    /* Do nothing if pulse time hasn't elapsed yet */
-    if (millis() - _pulse_start_ms < _pulse_dur_ms) {
-        return;
-    }
-
-    /* Set the pin low */
-    int pin = PinCtrl::get_highest_bit(_pins_to_pulse);
-    if (pin < 0) { // note - should never happen
-        Serial.println("!!! Pulse active with no pin set");
-        return;
-    }
-
-    digitalWrite(pin, LOW);
-    PinCtrl::clear_highest_bit(_pins_to_pulse);
-
-    /* If there's nothing left to do, stop */
-    if (!_pins_to_pulse) {
-        DBG_LOG("Done with pulsing");
-        _pulse_start_ms = 0;
-        return;
-    }
-
-    /* Start next pulse */
-    pin = PinCtrl::get_highest_bit(_pins_to_pulse);
-    if (pin < 0) { // note - should never happen
-        Serial.println("!!! Next pulse starting with no pin set");
-        return;
-    }
-
-    DBG_LOG("Pulsing pin ");
-    DBG_LOG(pin);
-    DBG_LOG(" for ");
-    DBG_LOG_LINE(_pulse_dur_ms);
-
-    digitalWrite(pin, HIGH);
-    _pulse_start_ms = millis();
-}
-#else
-void PinCtrl::service_gpio_pulse() {}
-#endif
-
-void PinCtrl::callback(void *context, const std::uint8_t *data, std::uint16_t length)
+void PinCtrl::ble_uart_callback(void *context, const std::uint8_t *data, std::uint16_t length)
 {
     auto *_this = reinterpret_cast<PinCtrl *>(context);
 
@@ -239,6 +185,31 @@ void PinCtrl::callback(void *context, const std::uint8_t *data, std::uint16_t le
 
     std::memcpy(&_this->_buffer[_this->_buffer_cnt], data, length);
     _this->_buffer_cnt += length;
+}
+
+void PinCtrl::timer_timeout_callback(void *context)
+{
+    auto *_this = reinterpret_cast<PinCtrl *>(context);
+
+    if (_this->_pulse_cnt <= 0) {
+        NRF_LOG_WARNING("Timer timed out with no pins to pulse!");
+        return;
+    }
+
+    /* Turn off the current pin and shift the queue. */
+    nrf_gpio_pin_clear(_this->_pulse_pins[0]);
+    std::memmove(&_this->_pulse_pins[0], &_this->_pulse_pins[1],
+        sizeof(_this->_pulse_pins) - sizeof(_this->_pulse_pins[0]));
+    --_this->_pulse_cnt;
+
+    /* Stop if no more pins to pulse */
+    if (_this->_pulse_cnt <= 0) {
+        return;
+    }
+
+    /* Start the next pin */
+    nrf_gpio_pin_set(_this->_pulse_pins[0]);
+    APP_ERROR_CHECK(app_timer_start(_this->_timer, APP_TIMER_TICKS(_this->_pulse_dur_ms), _this));
 }
 
 }  // namespace ble_uart_pin_ctrl

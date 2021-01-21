@@ -8,9 +8,11 @@
 
 #pragma once
 
+#include "boards_inc.h"
 #include "nordic_ble.hpp"
 
 #include <app_error.h>
+#include <app_timer.h>
 
 #include <cstdint>
 #include <cstddef>
@@ -112,6 +114,22 @@ private:
     std::uint8_t _buffer[BUFFER_SIZE];
     volatile std::size_t _buffer_cnt;
 
+    /** An app timer control block and instance pointer.
+      * NOTE: this is defined without the macro so that it can be per class instance. This could
+      *       introduce issues in later SDK versions, keep an eye on changes.
+      */
+    app_timer_t _timer_cb = {
+        .active = false,
+    };
+    const app_timer_id_t _timer = &_timer_cb;
+
+    /** Queue of pins to be pulsed. */
+    std::uint8_t _pulse_pins[SOLENOID_COUNT];
+    /** Number of pins left in the queue. */
+    std::size_t _pulse_cnt;
+    /** Duration of each pulse in ms. */
+    std::uint32_t _pulse_dur_ms;
+
     /** Functions to handle commands */
     void handle_gpio_configure();
     void handle_gpio_write();
@@ -119,9 +137,6 @@ private:
     void handle_gpio_query();
     void handle_pwm_set();
     void handle_query_state();
-
-    /** Service any ongoing pulse command */
-    void service_gpio_pulse();
 
     /** Copy bytes from the BLE UART byte buffer into the type T */
     template <typename T>
@@ -140,8 +155,10 @@ private:
     }
 
 public:
-    PinCtrl() {
-        ble::register_callback(this, callback);
+    PinCtrl() : _buffer {}, _buffer_cnt {}, _pulse_pins {}, _pulse_cnt {}, _pulse_dur_ms {} {
+        ble::register_callback(this, ble_uart_callback);
+        APP_ERROR_CHECK(
+            app_timer_create(&_timer, APP_TIMER_MODE_SINGLE_SHOT, timer_timeout_callback));
     }
     virtual ~PinCtrl() {}
 
@@ -149,8 +166,10 @@ public:
     void service();
 
     /** Callback to handle incoming UART data. */
-    // TODO: add contexts to callbacks
-    static void callback(void *context, const std::uint8_t *data, std::uint16_t length);
+    static void ble_uart_callback(void *context, const std::uint8_t *data, std::uint16_t length);
+
+    /** Callback called when the timer expires. */
+    static void timer_timeout_callback(void *context);
 };
 
 }  // namespace ble_uart_pin_ctrl
