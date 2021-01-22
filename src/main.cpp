@@ -80,12 +80,6 @@ using namespace ble_uart_pin_ctrl;
     unwind. */
 constexpr std::uint32_t DEAD_BEEF { 0xDEADBEEF };
 
-/**< UART TX buffer size. */
-constexpr std::uint32_t UART_TX_BUF_SIZE { 256 };
-
-/**< UART RX buffer size. */
-constexpr std::uint32_t UART_RX_BUF_SIZE { 256 };
-
 constexpr std::uint32_t SOLENOID_PIN_CNT { 5 };
 constexpr std::uint8_t SOLENOID_PINS[SOLENOID_PIN_CNT] {
     SOLENOID_THUMB,
@@ -99,15 +93,6 @@ constexpr std::uint8_t SOLENOID_PINS[SOLENOID_PIN_CNT] {
 // Private data
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/** App timer instance to update PWMs. */
-APP_TIMER_DEF(m_pwm_update_timer);
-
-/** Duty cycle for LEDs. */
-static constexpr int ADJUST { 250 };
-static int m_conn_duty_cycle { 10000 };
-static int m_conn_adjust { -ADJUST };
-static int m_d3_duty_cycle { 0 };
-static int m_d3_adjust { ADJUST };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
@@ -129,42 +114,12 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
     app_error_handler(DEAD_BEEF, line_num, p_file_name);
 }
 
-static void pwm_timer_callback(void *p_context)
-{
-    /* Adjust duty cycles */
-    m_conn_duty_cycle += m_conn_adjust;
-    m_d3_duty_cycle += m_d3_adjust;
-
-    if (m_conn_duty_cycle <= 0) {
-        m_conn_duty_cycle = 0;
-        m_conn_adjust = +ADJUST;
-    } else if (m_conn_duty_cycle >= 10000) {
-        m_conn_duty_cycle = 10000;
-        m_conn_adjust = -ADJUST;
-    }
-
-    if (m_d3_duty_cycle <= 0) {
-        m_d3_duty_cycle = 0;
-        m_d3_adjust = +ADJUST;
-    } else if (m_d3_duty_cycle >= 10000) {
-        m_d3_duty_cycle = 10000;
-        m_d3_adjust = -ADJUST;
-    }
-
-    NRF_LOG_INFO("Update PWM: conn=%d, d3=%d", m_conn_duty_cycle, m_d3_duty_cycle);
-
-    pwm::set_duty_cycle(FEATHER_LED_CONN_PIN, m_conn_duty_cycle);
-    pwm::set_duty_cycle(FEATHER_LED_D3_PIN, m_d3_duty_cycle);
-}
-
 /**@brief Function for initializing the timer module.
  */
 static void timers_init()
 {
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
-
-    err_code = app_timer_create(&m_pwm_update_timer, APP_TIMER_MODE_REPEATED, pwm_timer_callback);
 }
 
 /**@brief Function for handling events from the BSP module.
@@ -250,13 +205,6 @@ static void init_solenoid_gpio()
     }
 }
 
-/* NOTE: following functions available for manipulating GPIO:
- * nrf_gpio_pin_set(uint32_t pin_number);
- * nrf_gpio_pin_clear(uint32_t pin_number);
- * nrf_gpio_pin_toggle(uint32_t pin_number);
- * nrf_gpio_pin_write(uint32_t pin_number, uint32_t value);
- */
-
 /**@brief Application main function.
  */
 int main(void)
@@ -278,9 +226,6 @@ int main(void)
     printf("\r\nUART started.\r\n");
     NRF_LOG_INFO("Debug logging over UART started.");
     ble::advertise();
-
-    // Start timer
-    APP_ERROR_CHECK(app_timer_start(m_pwm_update_timer, 10000, nullptr));
 
     // Enter main loop.
     for (;;)
