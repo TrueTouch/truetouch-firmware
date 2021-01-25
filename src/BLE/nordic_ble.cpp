@@ -22,6 +22,8 @@
 
 #include <cstddef>
 
+// TODO: restart advertising upon disconnect
+
 namespace ble {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -307,12 +309,12 @@ static void gatt_init()
 static void advertising_init()
 {
     ble_advertising_init_t init {};
-    init.advdata.name_type          = BLE_ADVDATA_FULL_NAME;
     init.advdata.include_appearance = false;
     init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+    init.advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
+    init.advdata.uuids_complete.p_uuids  = m_adv_uuids;
 
-    init.srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
-    init.srdata.uuids_complete.p_uuids  = m_adv_uuids;
+    init.srdata.name_type           = BLE_ADVDATA_FULL_NAME;
 
     init.config.ble_adv_fast_enabled  = true;
     init.config.ble_adv_fast_interval = ADV_INTERVAL;
@@ -334,7 +336,6 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
     APP_ERROR_HANDLER(nrf_error);
 }
 
-// TODO: implement haptic glove control protocol here
 static void nus_data_handler(ble_nus_evt_t * p_evt)
 {
 
