@@ -142,11 +142,18 @@ private:
     template <typename T>
     T parse_bytes() {
         if (_buffer_cnt < sizeof(T)) {
-            /** Uh-oh... */
+            /* Uh-oh... */
             APP_ERROR_HANDLER(0);
         } else {
+            /* Grab the structure from the byte buffer. */
             T ret;
             std::memcpy(&ret, _buffer, sizeof(T));
+
+            /* Done with these bytes, "erase" them. */
+            std::size_t remaining = _buffer_cnt - sizeof(T);
+            std::memmove(&_buffer[0], &_buffer[sizeof(T)], remaining);
+            _buffer_cnt -= sizeof(T);
+
             return ret;
         }
 

@@ -70,7 +70,9 @@ void PinCtrl::handle_gpio_configure() {
     params.gpio_port = util::byte_swap32(params.gpio_port);
     params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
 
-    NRF_LOG_DEBUG("GPIO_CONFIGURE: %x %d", params.gpio_bitset, params.gpio_direction);
+    NRF_LOG_DEBUG("GPIO_CONFIGURE: port=%d bitset=0x%x dir=%s",
+        params.gpio_port, params.gpio_bitset,
+        params.gpio_direction == GpioDirection::DIR_INPUT ? "input" : "output");
 
     /* Go through each bit and configure appropriate pins */
     for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
@@ -97,7 +99,9 @@ void PinCtrl::handle_gpio_write() {
     params.gpio_port = util::byte_swap32(params.gpio_port);
     params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
 
-    NRF_LOG_DEBUG("GPIO_WRITE: %x", params.gpio_bitset);
+    NRF_LOG_DEBUG("GPIO_WRITE: port=%d bitset=0x%x value=%s",
+        params.gpio_port, params.gpio_bitset,
+        params.output == GpioOutput::OUT_HIGH ? "high" : "low");
 
     /* Go through each bit and set appropriate pins */
     for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
@@ -121,7 +125,8 @@ void PinCtrl::handle_gpio_pulse() {
     params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
     params.duration_ms = util::byte_swap32(params.duration_ms);
 
-    NRF_LOG_DEBUG("GPIO_PULSE: %x %d", params.gpio_bitset, params.duration_ms);
+    NRF_LOG_DEBUG("GPIO_PULSE: port=%d bitset=0x%x duration=%dms",
+        params.gpio_port, params.gpio_bitset, params.duration_ms);
 
     /* Store which pins to pulse */
     for (int pin_idx = 0; pin_idx < 32 && _pulse_cnt < SOLENOID_COUNT; ++pin_idx) {
@@ -157,14 +162,15 @@ void PinCtrl::handle_pwm_set() {
     params.gpio_port = util::byte_swap32(params.gpio_port);
     params.gpio_bitset = util::byte_swap32(params.gpio_bitset);
 
-    NRF_LOG_DEBUG("PWM_SET: %x %d", params.gpio_bitset, params.intensity);
+    NRF_LOG_DEBUG("PWM_SET: port=%d bitset=0x%x intensity=%d",
+        params.gpio_port, params.gpio_bitset, params.intensity);
 
     /* Go through each bit and set PWM on appropriate pins */
     for (int pin_idx = 0; pin_idx < 32; ++pin_idx) {
         if (util::is_set(params.gpio_bitset, pin_idx)) {
             auto pin = NRF_GPIO_PIN_MAP(params.gpio_port, pin_idx);
-            // TODO CMK (1/21/21): this will be the wrong duty cycle... need to adjust/map some things
-            pwm::set_duty_cycle(pin, params.intensity);
+            /* Protocol currently uses 1-byte (i.e. 0-255) for PWM intensity */
+            pwm::set_duty_cycle(pin, pwm::map_to_duty_cycle(params.intensity, 0, 255));
         }
     }
 }

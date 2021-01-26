@@ -89,9 +89,9 @@ void init()
             PWM0_CHANNEL3,
         },
         .irq_priority = APP_IRQ_PRIORITY_LOWEST,
-        .base_clock   = NRF_PWM_CLK_1MHz,
+        .base_clock   = BASE_CLK,
         .count_mode   = NRF_PWM_MODE_UP,
-        .top_value    = 10000, // TODO: what top value to use?
+        .top_value    = TOP_VALUE,
         .load_mode    = NRF_PWM_LOAD_INDIVIDUAL,
         .step_mode    = NRF_PWM_STEP_AUTO
     };
@@ -107,9 +107,9 @@ void init()
             PWM1_CHANNEL3,
         },
         .irq_priority = APP_IRQ_PRIORITY_LOWEST,
-        .base_clock   = NRF_PWM_CLK_1MHz,
+        .base_clock   = BASE_CLK,
         .count_mode   = NRF_PWM_MODE_UP,
-        .top_value    = 10000, // TODO: what top value to use?
+        .top_value    = TOP_VALUE,
         .load_mode    = NRF_PWM_LOAD_INDIVIDUAL,
         .step_mode    = NRF_PWM_STEP_AUTO
     };
@@ -132,28 +132,28 @@ void set_duty_cycle(std::uint8_t pin, std::uint16_t duty_cycle)
 static std::uint16_t *get_duty_cycle(std::uint8_t pin)
 {
     switch (pin) {
-        case PWM0_CHANNEL0:
+        case (PWM0_CHANNEL0 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_0;
 
-        case PWM0_CHANNEL1:
+        case (PWM0_CHANNEL1 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_1;
 
-        case PWM0_CHANNEL2:
+        case (PWM0_CHANNEL2 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_2;
 
-        case PWM0_CHANNEL3:
+        case (PWM0_CHANNEL3 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_3;
 
-        case PWM1_CHANNEL0:
+        case (PWM1_CHANNEL0 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm1_seq_values.channel_0;
 
-        case PWM1_CHANNEL1:
+        case (PWM1_CHANNEL1 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm1_seq_values.channel_1;
 
-        case PWM1_CHANNEL2:
+        case (PWM1_CHANNEL2 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm1_seq_values.channel_2;
 
-        case PWM1_CHANNEL3:
+        case (PWM1_CHANNEL3 & ~NRFX_PWM_PIN_INVERTED):
             return &m_pwm1_seq_values.channel_3;
 
         default:
