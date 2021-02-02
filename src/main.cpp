@@ -52,9 +52,8 @@
 // Includes
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "bleuart_pin_ctrl.hpp"
 #include "nordic_ble.hpp"
-#include "nordic_pwm.hpp"
+#include "truetouch.hpp"
 #include "util.hpp"
 
 #include <app_timer.h>
@@ -71,23 +70,12 @@
 
 #include <cstddef>
 
-using namespace ble_uart_pin_ctrl;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /** Value used as error code on stack dump, can be used to identify stack location on stack
     unwind. */
 constexpr std::uint32_t DEAD_BEEF { 0xDEADBEEF };
-
-constexpr std::uint32_t SOLENOID_PIN_CNT { 5 };
-constexpr std::uint8_t SOLENOID_PINS[SOLENOID_PIN_CNT] {
-    SOLENOID_THUMB,
-    SOLENOID_INDEX,
-    SOLENOID_MIDDLE,
-    SOLENOID_RING,
-    SOLENOID_PINKY,
-};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private data
@@ -196,15 +184,6 @@ static void idle_state_handle()
     }
 }
 
-/**@brief Initialize GPIO outputs to solenoids.
- */
-static void init_solenoid_gpio()
-{
-    for (std::size_t i = 0; i < SOLENOID_PIN_CNT; ++i) {
-        nrf_gpio_cfg_output(SOLENOID_PINS[i]);
-    }
-}
-
 /**@brief Application main function.
  */
 int main(void)
@@ -215,12 +194,11 @@ int main(void)
     log_init();
     timers_init();
     buttons_leds_init(&erase_bonds);
-    init_solenoid_gpio();
     power_management_init();
     ble::init();
-    pwm::init();
 
-    PinCtrl pin_ctrl {};
+    /* CTOR registers BLE callback and configures solenoid/ERM pins */
+    TrueTouch truetouch {};
 
     // Start execution.
     printf("\r\nUART started.\r\n");
@@ -231,7 +209,7 @@ int main(void)
     for (;;)
     {
         idle_state_handle();
-        pin_ctrl.service();
+        truetouch.service();
     }
 }
 
