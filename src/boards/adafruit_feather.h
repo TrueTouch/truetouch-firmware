@@ -119,3 +119,8 @@
 #define SOLENOID_MIDDLE         FEATHER_A2_PIN
 #define SOLENOID_RING           FEATHER_A3_PIN
 #define SOLENOID_PINKY          FEATHER_A4_PIN
+
+/* Set true so PWM is inverted (i.e. runs high until
+   it hits the top value then goes low) - so, a duty cycle of 255 is always on,
+   0 is always off. */
+#define INVERT_PWM              true

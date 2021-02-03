@@ -60,16 +60,6 @@ static nrf_pwm_sequence_t const    m_pwm1_seq =
 static std::uint16_t *get_duty_cycle(std::uint8_t pin);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Private handler/callback prototypes
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/** Handler for PWM0 events. */
-static void pwm0_handler(nrf_drv_pwm_evt_type_t event_type);
-
-/** Handler for PWM1 events. */
-static void pwm1_handler(nrf_drv_pwm_evt_type_t event_type);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 // Public implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,7 +86,13 @@ void init()
         .step_mode    = NRF_PWM_STEP_AUTO
     };
 
-    APP_ERROR_CHECK(nrf_drv_pwm_init(&m_pwm0, &config0, pwm0_handler));
+    APP_ERROR_CHECK(nrf_drv_pwm_init(&m_pwm0, &config0, nullptr));
+
+    m_pwm0_seq_values.channel_0 = POLARITY | 0;
+    m_pwm0_seq_values.channel_1 = POLARITY | 0;
+    m_pwm0_seq_values.channel_2 = POLARITY | 0;
+    m_pwm0_seq_values.channel_3 = POLARITY | 0;
+
     nrf_drv_pwm_simple_playback(&m_pwm0, &m_pwm0_seq, 1, NRF_DRV_PWM_FLAG_LOOP);
 
     nrf_drv_pwm_config_t config1 {
@@ -114,7 +110,13 @@ void init()
         .step_mode    = NRF_PWM_STEP_AUTO
     };
 
-    APP_ERROR_CHECK(nrf_drv_pwm_init(&m_pwm1, &config1, pwm1_handler));
+    APP_ERROR_CHECK(nrf_drv_pwm_init(&m_pwm1, &config1, nullptr));
+
+    m_pwm1_seq_values.channel_0 = POLARITY | 0;
+    m_pwm1_seq_values.channel_1 = POLARITY | 0;
+    m_pwm1_seq_values.channel_2 = POLARITY | 0;
+    m_pwm1_seq_values.channel_3 = POLARITY | 0;
+
     nrf_drv_pwm_simple_playback(&m_pwm1, &m_pwm1_seq, 1, NRF_DRV_PWM_FLAG_LOOP);
 }
 
@@ -123,7 +125,7 @@ void set_duty_cycle(std::uint8_t pin, std::uint16_t duty_cycle)
     std::uint16_t *p_duty_cycle = get_duty_cycle(pin);
     APP_ERROR_CHECK_BOOL(nullptr != p_duty_cycle);
 
-    *p_duty_cycle = duty_cycle;
+    *p_duty_cycle = POLARITY | duty_cycle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,47 +134,27 @@ void set_duty_cycle(std::uint8_t pin, std::uint16_t duty_cycle)
 static std::uint16_t *get_duty_cycle(std::uint8_t pin)
 {
     switch (pin) {
-        case (PWM0_CHANNEL0 & ~NRFX_PWM_PIN_INVERTED):
+        case (PWM0_CHANNEL0 & ~NRF_DRV_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_0;
 
-        case (PWM0_CHANNEL1 & ~NRFX_PWM_PIN_INVERTED):
+        case (PWM0_CHANNEL1 & ~NRF_DRV_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_1;
 
-        case (PWM0_CHANNEL2 & ~NRFX_PWM_PIN_INVERTED):
+        case (PWM0_CHANNEL2 & ~NRF_DRV_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_2;
 
-        case (PWM0_CHANNEL3 & ~NRFX_PWM_PIN_INVERTED):
+        case (PWM0_CHANNEL3 & ~NRF_DRV_PWM_PIN_INVERTED):
             return &m_pwm0_seq_values.channel_3;
 
-        case (PWM1_CHANNEL0 & ~NRFX_PWM_PIN_INVERTED):
+        case (PWM1_CHANNEL0 & ~NRF_DRV_PWM_PIN_INVERTED):
             return &m_pwm1_seq_values.channel_0;
 
-        case (PWM1_CHANNEL1 & ~NRFX_PWM_PIN_INVERTED):
+        case (PWM1_CHANNEL1 & ~NRF_DRV_PWM_PIN_INVERTED):
             return &m_pwm1_seq_values.channel_1;
-
-        case (PWM1_CHANNEL2 & ~NRFX_PWM_PIN_INVERTED):
-            return &m_pwm1_seq_values.channel_2;
-
-        case (PWM1_CHANNEL3 & ~NRFX_PWM_PIN_INVERTED):
-            return &m_pwm1_seq_values.channel_3;
 
         default:
            return nullptr;
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Private handler/callback implementations
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void pwm0_handler(nrf_drv_pwm_evt_type_t event_type)
-{
-    // TODO: do we care about any of this?
-}
-
-static void pwm1_handler(nrf_drv_pwm_evt_type_t event_type)
-{
-    // TODO: do we care about any of this?
 }
 
 }  // namespace pwm

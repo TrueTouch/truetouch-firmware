@@ -40,7 +40,7 @@ public:
         MIDDLE = 2,
         RING = 3,
         PINKY = 4,
-        PALM = 6,
+        PALM = 5,
     };
 
     /** Solenoid write options. */

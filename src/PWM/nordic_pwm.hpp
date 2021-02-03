@@ -30,30 +30,20 @@ constexpr std::uint8_t PWM0_CHANNEL0 { ERM_THUMB };
 constexpr std::uint8_t PWM0_CHANNEL1 { ERM_INDEX };
 constexpr std::uint8_t PWM0_CHANNEL2 { ERM_MIDDLE };
 constexpr std::uint8_t PWM0_CHANNEL3 { ERM_RING };
-constexpr std::uint8_t PWM0_PINS[NRF_PWM_CHANNEL_COUNT] {
-    PWM0_CHANNEL0,
-    PWM0_CHANNEL1,
-    PWM0_CHANNEL2,
-    PWM0_CHANNEL3,
-};
 
 /** Pins used in the second PWM channel. */
 constexpr std::uint8_t PWM1_CHANNEL0 { ERM_PINKY };
-constexpr std::uint8_t PWM1_CHANNEL1 { ERM_PALM };
-/* The following two LED pins are used for testing. */
-constexpr std::uint8_t PWM1_CHANNEL2 { FEATHER_LED_CONN_PIN | NRF_DRV_PWM_PIN_INVERTED };
-constexpr std::uint8_t PWM1_CHANNEL3 { FEATHER_LED_D3_PIN | NRF_DRV_PWM_PIN_INVERTED };
-constexpr std::uint8_t PWM1_PINS[NRF_PWM_CHANNEL_COUNT] {
-    PWM1_CHANNEL0,
-    PWM1_CHANNEL1,
-    PWM1_CHANNEL2,
-    PWM1_CHANNEL3,
-};
+constexpr std::uint8_t PWM1_CHANNEL1 { ERM_PALM }; // temporarily LED_D3
+constexpr std::uint8_t PWM1_CHANNEL2 { FEATHER_LED_CONN_PIN };
+constexpr std::uint8_t PWM1_CHANNEL3 { NRF_DRV_PWM_PIN_NOT_USED };
 
 /** Frequency of clock driving the PWM module. Together with the top value determines
     overall frequency of the PWM. */
-constexpr nrf_pwm_clk_t BASE_CLK { NRF_PWM_CLK_1MHz };
+constexpr nrf_pwm_clk_t BASE_CLK { NRF_PWM_CLK_250kHz };
 constexpr std::uint16_t TOP_VALUE { 256 };
+
+/** Value to be OR'd with duty cycle value to set it to either rising edge or falling edge. */
+constexpr std::uint16_t POLARITY { INVERT_PWM ? 0x8000 : 0x0000 };
 
 /** Initialize the PWM library. Blocks until the PWM is ready. */
 void init();
