@@ -1,6 +1,6 @@
 /**
- * ble_truetouch.cpp - a simple protocol written on top of a BLE UART for controlling pins on
- *                     the TrueTouch device.
+ * truetouch.cpp - a simple protocol written on top of a BLE UART for controlling pins on
+ *                 the TrueTouch device.
  *
  * Copyright (c) 2021 TrueTouch
  * Distributed under the MIT license (see LICENSE or https://opensource.org/licenses/MIT)
