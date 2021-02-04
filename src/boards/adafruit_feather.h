@@ -123,4 +123,8 @@
 /* Set true so PWM is inverted (i.e. runs high until
    it hits the top value then goes low) - so, a duty cycle of 255 is always on,
    0 is always off. */
-#define INVERT_PWM              true
+#define TRUETOUCH_INVERT_PWM    true
+
+/* Set true so pulsing happens in parallel (all pins on then all pins off) instead of
+   sequentially. */
+#define TRUETOUCH_PULSE_PARALLEL    true

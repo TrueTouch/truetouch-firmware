@@ -10,6 +10,8 @@
 
 #include "nordic_ble.hpp"
 
+#include "boards_inc.h"
+
 #include <app_error.h>
 #include <app_timer.h>
 
@@ -17,6 +19,11 @@
 #include <climits>
 #include <cstddef>
 #include <cstring>
+
+#ifndef TRUETOUCH_PULSE_PARALLEL
+#   warning "TRUETOUCH_PULSE_PARALLEL not defined - defaulting to false"
+#define TRUETOUCH_PULSE_PARALLEL false
+#endif
 
 class TrueTouch {
 public:
@@ -82,8 +89,14 @@ public:
     /** Number of solenoids in the system. */
     static constexpr std::size_t SOLENOID_COUNT { 5 };
 
+    /** Mask of possible solenoid bits in a bitset. */
+    static constexpr std::uint32_t SOLENOID_MASK { (1UL << SOLENOID_COUNT) - 1 };
+
     /** Number of ERM motors in the system. */
     static constexpr std::size_t ERM_COUNT { 6 };
+
+    /** Mask of possible ERM motor bits in a bitset. */
+    static constexpr std::uint32_t ERM_MASK { (1UL << ERM_COUNT) - 1 };
 
 public:
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,6 +158,8 @@ private:
     /** Functions to handle commands */
     void handle_solenoid_write();
     void handle_solenoid_pulse();
+    void handle_solenoid_pulse_sequential();
+    void handle_solenoid_pulse_parallel();
     void handle_erm_set();
 
     /** Copy bytes from the BLE UART byte buffer into the type T */
@@ -175,4 +190,6 @@ private:
 
     /** Callback called when the timer expires. */
     static void timer_timeout_callback(void *context);
+    static void timer_timeout_callback_parallel(void *context);
+    static void timer_timeout_callback_sequential(void *context);
 };

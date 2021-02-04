@@ -43,7 +43,11 @@ constexpr nrf_pwm_clk_t BASE_CLK { NRF_PWM_CLK_250kHz };
 constexpr std::uint16_t TOP_VALUE { 256 };
 
 /** Value to be OR'd with duty cycle value to set it to either rising edge or falling edge. */
-constexpr std::uint16_t POLARITY { INVERT_PWM ? 0x8000 : 0x0000 };
+#ifndef TRUETOUCH_INVERT_PWM
+#   warning "TRUETOUCH_INVERT_PWM not defined - defaulting to false"
+#define TRUETOUCH_INVERT_PWM false
+#endif
+constexpr std::uint16_t POLARITY { TRUETOUCH_INVERT_PWM ? 0x8000 : 0x0000 };
 
 /** Initialize the PWM library. Blocks until the PWM is ready. */
 void init();

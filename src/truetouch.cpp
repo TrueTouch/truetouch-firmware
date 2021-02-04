@@ -124,12 +124,17 @@ void TrueTouch::handle_solenoid_write() {
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<SolenoidWrite>();
 
-    /* Fix endianness for multi-byte pieces of data */
-    params.finger_bitset = util::byte_swap32(params.finger_bitset);
+    /* Fix endianness and mask any extraneous values */
+    params.finger_bitset = util::byte_swap32(params.finger_bitset) & SOLENOID_MASK;
 
-    NRF_LOG_DEBUG("GPIO_WRITE: finger bitset=0x%x value=%s",
-        params.finger_bitset,
+    NRF_LOG_DEBUG("%s: finger bitset=0x%x value=%s",
+        __func__, params.finger_bitset,
         params.output == GpioOutput::OUT_HIGH ? "high" : "low");
+
+    if (params.finger_bitset == 0) {
+        NRF_LOG_WARNING("%s: no fingers set", __func__);
+        return;
+    }
 
     /* Go through each bit and set appropriate pins */
     for (int pin_idx = 0; pin_idx < SOLENOID_COUNT; ++pin_idx) {
@@ -148,33 +153,49 @@ void TrueTouch::handle_solenoid_pulse() {
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<SolenoidPulse>();
 
-    /* Fix endianness for multi-byte pieces of data */
-    params.finger_bitset = util::byte_swap32(params.finger_bitset);
+    /* Fix endianness and mask any extraneous values */
+    params.finger_bitset = util::byte_swap32(params.finger_bitset) & SOLENOID_MASK;
     params.duration_ms = util::byte_swap32(params.duration_ms);
 
-    NRF_LOG_DEBUG("GPIO_PULSE: finger bitset=0x%x duration=%dms",
+    NRF_LOG_DEBUG("%s (%s): finger bitset=0x%x duration=%dms",
+        __func__,
+        TRUETOUCH_PULSE_PARALLEL ? "parallel" : "sequential",
         params.finger_bitset, params.duration_ms);
 
-    /* Store which pins to pulse */
-    for (int pin_idx = 0; pin_idx < SOLENOID_COUNT; ++pin_idx) {
-        if (util::is_set(params.finger_bitset, pin_idx)) {
-            _pulse_pin_bitset |= (1UL << pin_idx);
-        }
-    }
-
-    if (!_pulse_pin_bitset) {
-        NRF_LOG_WARNING("GPIO pulse with no pins selected");
+    if (params.finger_bitset == 0) {
+        NRF_LOG_WARNING("%s: no fingers set", __func__);
         return;
     }
 
-    /* Store data for use by pin pulsing routine */
+    /* Store data for later use */
+    _pulse_pin_bitset = params.finger_bitset;
     _pulse_dur_ms = params.duration_ms;
 
+    if constexpr (TRUETOUCH_PULSE_PARALLEL) {
+        handle_solenoid_pulse_parallel();
+    } else {
+        handle_solenoid_pulse_sequential();
+    }
+}
+
+void TrueTouch::handle_solenoid_pulse_sequential() {
     /* Set the first pin high and start the timer. */
     auto pin = finger_to_solenoid_pin(util::get_highest_bit(_pulse_pin_bitset));
 
     NRF_LOG_DEBUG("Pulsing pin %d for %d", pin, _pulse_dur_ms);
     nrf_gpio_pin_set(pin);
+    APP_ERROR_CHECK(app_timer_start(_timer, APP_TIMER_TICKS(_pulse_dur_ms), this));
+}
+
+void TrueTouch::handle_solenoid_pulse_parallel() {
+    /* Set the pins high and start the timer. */
+    for (int pin_idx = 0; pin_idx < SOLENOID_COUNT; ++pin_idx) {
+        if (util::is_set(_pulse_pin_bitset, pin_idx)) {
+            auto pin = finger_to_solenoid_pin(pin_idx);
+            nrf_gpio_pin_set(pin);
+        }
+    }
+
     APP_ERROR_CHECK(app_timer_start(_timer, APP_TIMER_TICKS(_pulse_dur_ms), this));
 }
 
@@ -229,6 +250,32 @@ void TrueTouch::timer_timeout_callback(void *context)
         return;
     }
 
+    if constexpr (TRUETOUCH_PULSE_PARALLEL) {
+        timer_timeout_callback_parallel(context);
+    } else {
+        timer_timeout_callback_sequential(context);
+    }
+}
+
+void TrueTouch::timer_timeout_callback_parallel(void *context) {
+    auto *_this = reinterpret_cast<TrueTouch *>(context);
+
+    /* Turn off all the pins */
+    for (int pin_idx = 0; pin_idx < SOLENOID_COUNT; ++pin_idx) {
+        if (util::is_set(_this->_pulse_pin_bitset, pin_idx)) {
+            auto pin = finger_to_solenoid_pin(pin_idx);
+            nrf_gpio_pin_clear(pin);
+        }
+    }
+
+    /* Clear variables */
+    _this->_pulse_pin_bitset = 0;
+    _this->_pulse_dur_ms = 0;
+}
+
+void TrueTouch::timer_timeout_callback_sequential(void *context) {
+    auto *_this = reinterpret_cast<TrueTouch *>(context);
+
     /* Turn off the current pin and shift the queue. */
     auto pin = finger_to_solenoid_pin(util::get_highest_bit(_this->_pulse_pin_bitset));
     nrf_gpio_pin_clear(pin);
@@ -236,6 +283,7 @@ void TrueTouch::timer_timeout_callback(void *context)
 
     /* Stop if no more pins to pulse */
     if (!_this->_pulse_pin_bitset) {
+        _this->_pulse_dur_ms = 0;
         return;
     }
 
