@@ -34,6 +34,7 @@
     </folder>
     <folder Name="nRF_Log">
       <file file_name="$(SDK_DIR)/components/libraries/log/src/nrf_log_backend_uart.c" />
+      <file file_name="$(SDK_DIR)/components/libraries/log/src/nrf_log_backend_rtt.c" />
       <file file_name="$(SDK_DIR)/components/libraries/log/src/nrf_log_backend_serial.c" />
       <file file_name="$(SDK_DIR)/components/libraries/log/src/nrf_log_default_backends.c" />
       <file file_name="$(SDK_DIR)/components/libraries/log/src/nrf_log_frontend.c" />
@@ -73,6 +74,10 @@
     </folder>
     <folder Name="Board Definition">
       <file file_name="$(SDK_DIR)/components/boards/boards.c" />
+      <file file_name="../src/boards/adafruit_feather.h" />
+      <file file_name="../src/boards/boards_gpio.h" />
+      <file file_name="../src/boards/boards_inc.h" />
+      <file file_name="../src/boards/truetouch_pcba_001.h" />
     </folder>
     <folder Name="nRF_Drivers">
       <file file_name="$(SDK_DIR)/integration/nrfx/legacy/nrf_drv_clock.c" />
@@ -87,7 +92,6 @@
     </folder>
     <folder Name="Board Support">
       <file file_name="$(SDK_DIR)/components/libraries/bsp/bsp.c" />
-      <file file_name="$(SDK_DIR)/components/libraries/bsp/bsp_btn_ble.c" />
     </folder>
     <folder Name="Application">
       <file file_name="../src/main.cpp" />
@@ -169,7 +173,7 @@
     Name="nRF52832"
     arm_simulator_memory_simulation_parameter="RWX 00000000,00100000,FFFFFFFF;RWX 20000000,00010000,CDCDCDCD"
     arm_target_device_name="nRF52832_xxAA"
-    c_preprocessor_definitions="BOARD_PCA10040;NRF52832_XXAA;NRF52;NRF52_PAN_74;S132"
+    c_preprocessor_definitions="CUSTOM_BOARD_INC=truetouch_pcba_001;NRF52832_XXAA;NRF52;NRF52_PAN_74;S132"
     debug_additional_load_file="$(SDK_DIR)/components/softdevice/s132/hex/s132_nrf52_7.2.0_softdevice.hex"
     debug_register_definition_file="$(SDK_DIR)/modules/nrfx/mdk/nrf52.svd"
     hidden="Yes"

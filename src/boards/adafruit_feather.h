@@ -128,3 +128,6 @@
 /* Set true so pulsing happens in parallel (all pins on then all pins off) instead of
    sequentially. */
 #define TRUETOUCH_PULSE_PARALLEL    true
+
+/* Set true to use the UART logger backend, otherwise RTT will be used. */
+#define TRUETOUCH_USE_SERIAL        true

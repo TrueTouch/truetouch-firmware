@@ -20,4 +20,12 @@
 #endif
 #define NRF_LOG_BACKEND_UART_TX_PIN TX_PIN_NUMBER
 
+#if defined(TRUETOUCH_USE_SERIAL) && TRUETOUCH_USE_SERIAL
+#   define NRF_LOG_BACKEND_RTT_ENABLED 0
+#   define NRF_LOG_BACKEND_UART_ENABLED 1
+#else // use RTT logger backend
+#   define NRF_LOG_BACKEND_RTT_ENABLED 1
+#   define NRF_LOG_BACKEND_UART_ENABLED 0
+#endif
+
 #endif // APP_CONFIG_H
