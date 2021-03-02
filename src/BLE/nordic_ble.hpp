@@ -11,6 +11,7 @@
 
 #include <app_timer.h>
 #include <app_util.h>
+#include <ble.h>
 #include <ble_types.h>
 
 #include <cstdint>
@@ -68,6 +69,8 @@ constexpr std::uint32_t CALLBACK_MAX { 4 };
 // Types
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+using EventCallback = void (*)(ble_evt_t const *ble_evt);
+
 using UartCallback = void (*)(void *context, const std::uint8_t *data, std::uint16_t length);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,8 +80,10 @@ using UartCallback = void (*)(void *context, const std::uint8_t *data, std::uint
 /**
  * Initializes the Nordic BLE stack. Any errors during BLE stack initialization are handled by
  * using APP_ERROR_CHECK.
+ *
+ * @param[in] callback a function to call when BLE events happen.
  */
-void init();
+void init(EventCallback callback = nullptr);
 
 /**
  * Disconnects from the current connection.

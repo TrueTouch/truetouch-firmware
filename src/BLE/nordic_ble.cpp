@@ -52,10 +52,13 @@ static ble_uuid_t m_adv_uuids[] {
     {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
 };
 
+/** BLE events callback. */
+EventCallback m_event_callback;
+
 /** BLE write event callbacks and contexts. */
-std::uint32_t m_callback_cnt {};
-UartCallback m_callbacks[CALLBACK_MAX] {};
-void *m_contexts[CALLBACK_MAX] {};
+static std::uint32_t m_callback_cnt {};
+static UartCallback m_callbacks[CALLBACK_MAX] {};
+static void *m_contexts[CALLBACK_MAX] {};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private function prototypes
@@ -153,8 +156,10 @@ void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
 // Public implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void init()
+void init(EventCallback callback)
 {
+    m_event_callback = callback;
+
     ble_stack_init();
     gap_params_init();
     gatt_init();
@@ -403,7 +408,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("Disconnected");
-            // LED indication will be changed when advertising starts.
+            /** Automatically restarts advertising. */
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
 
@@ -448,6 +453,10 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
         default:
             // No implementation needed.
             break;
+    }
+
+    if (m_event_callback) {
+        m_event_callback(p_ble_evt);
     }
 }
 
