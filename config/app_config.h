@@ -20,12 +20,9 @@
 #endif
 #define NRF_LOG_BACKEND_UART_TX_PIN TX_PIN_NUMBER
 
-#if defined(TRUETOUCH_USE_SERIAL) && TRUETOUCH_USE_SERIAL
-#   define NRF_LOG_BACKEND_RTT_ENABLED 0
-#   define NRF_LOG_BACKEND_UART_ENABLED 1
-#else // use RTT logger backend
-#   define NRF_LOG_BACKEND_RTT_ENABLED 1
-#   define NRF_LOG_BACKEND_UART_ENABLED 0
+/**< Include a board-specific app config header if desired. */
+#if defined(USE_BOARD_APP_CONFIG) && defined(CUSTOM_BOARD_INC)
+#   include STRINGIFY(CONCAT_2(app_config_, CUSTOM_BOARD_INC.h))
 #endif
 
 #endif // APP_CONFIG_H
