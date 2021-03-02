@@ -105,6 +105,9 @@
 // TrueTouch Definitions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/* Status LED */
+#define STATUS_LED_PIN          LED_2
+
 /* ERM PWM pins (1 per finger + palm) */
 #define ERM_THUMB               FEATHER_D5_PIN
 #define ERM_INDEX               FEATHER_D6_PIN

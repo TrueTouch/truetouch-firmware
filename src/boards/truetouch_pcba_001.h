@@ -46,6 +46,9 @@
 // TrueTouch Definitions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/* Status LED */
+#define STATUS_LED_PIN          LED_1
+
 /* BL652 ERM PWM pin mapping */
 #define M1_PIN                  _nRF_GPIO_PIN_MAP(0, 16)    /* M1, BL652: 10 */
 #define M2_PIN                  _nRF_GPIO_PIN_MAP(0, 19)    /* M2, BL652: 31 */
