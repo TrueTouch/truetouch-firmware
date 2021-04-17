@@ -106,6 +106,10 @@ int main()
     timers_init();
     power_management_init();
 
+#ifdef BENCHMARK_TIMING
+      nrf_gpio_cfg_output(FEATHER_SDA_PIN);
+#endif
+
     /* Config status LED as output. */
     nrf_gpio_cfg_output(STATUS_LED_PIN);
     nrf_gpio_pin_clear(STATUS_LED_PIN);

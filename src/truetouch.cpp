@@ -23,7 +23,8 @@ APP_TIMER_DEF(MY_TEST_TIMER);
 // Public Functions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-TrueTouch::TrueTouch() : _buffer {}, _buffer_cnt {}, _pulse_pin_bitset {}, _pulse_dur_ms {} {
+TrueTouch::TrueTouch() : _buffer {}, _buffer_cnt {}, _pulse_pin_bitset {}, _pulse_dur_ms {},
+                         _current_pulse_bit {NO_ACTIVE_BIT} {
     ble::register_callback(this, ble_uart_callback);
     APP_ERROR_CHECK(
         app_timer_create(&_timer, APP_TIMER_MODE_SINGLE_SHOT, timer_timeout_callback));
@@ -45,7 +46,7 @@ void TrueTouch::service() {
         return;
     }
 
-    /* First byte is command, peek that */
+    /* First byte is command, peek that. */
     const Command command = static_cast<Command>(_buffer[0]);
 
     /* Perform command-specific processing (break if all data bytes aren't recieved yet) */
@@ -62,6 +63,18 @@ void TrueTouch::service() {
             handle_erm_set();
         } break;
     }
+
+    /* For debugging/benchmarking: send an ACK to get a rough RTT measurement. */
+#ifdef BENCHMARK_TIMING
+    std::uint8_t ack_msg[] = {
+        static_cast<std::uint8_t>(command),
+        's', 'u', 'c', 'c', 'e', 's', 's'
+    };
+    ack(ack_msg, sizeof(ack_msg));
+
+    /* Set pin high from when we get data to when we finish handling it. */
+    nrf_gpio_pin_clear(FEATHER_SDA_PIN);
+#endif
 }
 
 int TrueTouch::finger_to_solenoid_pin(Finger finger) {
@@ -150,6 +163,9 @@ void TrueTouch::handle_solenoid_pulse() {
         return; // missing bytes
     }
 
+    /* Stop the timer to avoid concurrency isses. */
+    APP_ERROR_CHECK(app_timer_stop(_timer));
+
     /* Parse byte buffer into the struct */
     auto params = parse_bytes<SolenoidPulse>();
 
@@ -164,11 +180,11 @@ void TrueTouch::handle_solenoid_pulse() {
 
     if (params.finger_bitset == 0) {
         NRF_LOG_WARNING("%s: no fingers set", __func__);
-        return;
     }
 
-    /* Store data for later use */
-    _pulse_pin_bitset = params.finger_bitset;
+    /* Store data for later use, without overwriting any current fingers that still
+     * need to be pulsed. */
+    _pulse_pin_bitset |= params.finger_bitset;
     _pulse_dur_ms = params.duration_ms;
 
     if constexpr (TRUETOUCH_PULSE_PARALLEL) {
@@ -179,16 +195,22 @@ void TrueTouch::handle_solenoid_pulse() {
 }
 
 void TrueTouch::handle_solenoid_pulse_sequential() {
-    /* Set the first pin high and start the timer. */
-    auto pin = finger_to_solenoid_pin(util::get_highest_bit(_pulse_pin_bitset));
+    /* Either a pulse is ongoing or it isn't; if there's no active pin,
+     * choose the highest one from the bitset to be active. */
+    if (_current_pulse_bit == NO_ACTIVE_BIT) {
+        _current_pulse_bit = util::get_highest_bit(_pulse_pin_bitset);
+    }
+    auto pin = finger_to_solenoid_pin(_current_pulse_bit);
 
     NRF_LOG_DEBUG("Pulsing pin %d for %d", pin, _pulse_dur_ms);
     nrf_gpio_pin_set(pin);
+
+    /* (Re)start the timer. */
     APP_ERROR_CHECK(app_timer_start(_timer, APP_TIMER_TICKS(_pulse_dur_ms), this));
 }
 
 void TrueTouch::handle_solenoid_pulse_parallel() {
-    /* Set the pins high and start the timer. */
+    /* Set all pins high and (re)start the timer. */
     for (int pin_idx = 0; pin_idx < SOLENOID_COUNT; ++pin_idx) {
         if (util::is_set(_pulse_pin_bitset, pin_idx)) {
             auto pin = finger_to_solenoid_pin(pin_idx);
@@ -223,8 +245,14 @@ void TrueTouch::handle_erm_set() {
     }
 }
 
+#ifdef BENCHMARK_TIMING
+void TrueTouch::ack(std::uint8_t *bytes, std::uint16_t len) {
+    ble::send(bytes, len);
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Static Internal Callbacks
+// Internal Callbacks
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void TrueTouch::ble_uart_callback(void *context, const std::uint8_t *data, std::uint16_t length)
@@ -251,44 +279,42 @@ void TrueTouch::timer_timeout_callback(void *context)
     }
 
     if constexpr (TRUETOUCH_PULSE_PARALLEL) {
-        timer_timeout_callback_parallel(context);
+        _this->timer_timeout_callback_parallel();
     } else {
-        timer_timeout_callback_sequential(context);
+        _this->timer_timeout_callback_sequential();
     }
 }
 
-void TrueTouch::timer_timeout_callback_parallel(void *context) {
-    auto *_this = reinterpret_cast<TrueTouch *>(context);
-
+void TrueTouch::timer_timeout_callback_parallel() {
     /* Turn off all the pins */
     for (int pin_idx = 0; pin_idx < SOLENOID_COUNT; ++pin_idx) {
-        if (util::is_set(_this->_pulse_pin_bitset, pin_idx)) {
+        if (util::is_set(_pulse_pin_bitset, pin_idx)) {
             auto pin = finger_to_solenoid_pin(pin_idx);
             nrf_gpio_pin_clear(pin);
         }
     }
 
     /* Clear variables */
-    _this->_pulse_pin_bitset = 0;
-    _this->_pulse_dur_ms = 0;
+    _pulse_pin_bitset = 0;
+    _pulse_dur_ms = 0;
 }
 
-void TrueTouch::timer_timeout_callback_sequential(void *context) {
-    auto *_this = reinterpret_cast<TrueTouch *>(context);
-
+void TrueTouch::timer_timeout_callback_sequential() {
     /* Turn off the current pin and shift the queue. */
-    auto pin = finger_to_solenoid_pin(util::get_highest_bit(_this->_pulse_pin_bitset));
+    auto pin = finger_to_solenoid_pin(_current_pulse_bit);
     nrf_gpio_pin_clear(pin);
-    util::clear_highest_bit(_this->_pulse_pin_bitset);
+    util::clear_bit(_pulse_pin_bitset, _current_pulse_bit);
 
     /* Stop if no more pins to pulse */
-    if (!_this->_pulse_pin_bitset) {
-        _this->_pulse_dur_ms = 0;
+    if (!_pulse_pin_bitset) {
+        _pulse_dur_ms = 0;
+        _current_pulse_bit = NO_ACTIVE_BIT;
         return;
     }
 
     /* Start the next pin */
-    pin = finger_to_solenoid_pin(util::get_highest_bit(_this->_pulse_pin_bitset));
+    _current_pulse_bit = util::get_highest_bit(_pulse_pin_bitset);
+    pin = finger_to_solenoid_pin(_current_pulse_bit);
     nrf_gpio_pin_set(pin);
-    APP_ERROR_CHECK(app_timer_start(_this->_timer, APP_TIMER_TICKS(_this->_pulse_dur_ms), _this));
+    APP_ERROR_CHECK(app_timer_start(_timer, APP_TIMER_TICKS(_pulse_dur_ms), this));
 }

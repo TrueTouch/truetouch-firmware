@@ -42,12 +42,16 @@ inline int get_highest_bit(std::uint32_t mask) {
     return -1;
 }
 
+// clear the given bit
+inline void clear_bit(std::uint32_t &mask, int bit_pos) {
+    if (bit_pos >= 0) {
+        mask &= ~(1UL << bit_pos);
+    }
+}
+
 // clears the bit position of the highest set bit
 inline void clear_highest_bit(std::uint32_t &mask) {
-    int n = get_highest_bit(mask);
-    if (n >= 0) {
-        mask &= ~(1UL << n);
-    }
+    clear_bit(mask, get_highest_bit(mask));
 }
 
 }  // namespace util

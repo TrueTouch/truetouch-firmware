@@ -34,7 +34,7 @@ constexpr std::uint32_t NUS_SERVICE_UUID_TYPE { BLE_UUID_TYPE_VENDOR_BEGIN };
 constexpr std::uint32_t ADV_INTERVAL { 64 };
 
 /** The advertising duration (180 seconds) in units of 10 milliseconds. */
-constexpr std::uint32_t ADV_DURATION { 0 };
+constexpr std::uint32_t ADV_DURATION { 18000 };
 
 /** Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
 constexpr std::uint32_t MIN_CONN_INTERVAL { MSEC_TO_UNITS(20, UNIT_1_25_MS) };

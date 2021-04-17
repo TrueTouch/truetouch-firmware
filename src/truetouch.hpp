@@ -130,6 +130,13 @@ public:
 
 private:
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// Internal Constants
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /** The value used when there's no current pulse bit. */
+    static constexpr std::uint32_t NO_ACTIVE_BIT = static_cast<std::uint32_t>(-1);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Internal Data
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -150,6 +157,8 @@ private:
     Bitset _pulse_pin_bitset;
     /** Duration of each pulse in ms. */
     std::uint32_t _pulse_dur_ms;
+    /** Currently active bit being pulsed (used for sequential pulsing config). */
+    std::uint32_t _current_pulse_bit;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Internal Functions
@@ -161,6 +170,12 @@ private:
     void handle_solenoid_pulse_sequential();
     void handle_solenoid_pulse_parallel();
     void handle_erm_set();
+
+    /* Sends an ACK for debugging/benchmarking purposes. Sends the given
+     * message to the other side. */
+#ifdef BENCHMARK_TIMING
+    void ack(std::uint8_t *bytes, std::uint16_t len);
+#endif
 
     /** Copy bytes from the BLE UART byte buffer into the type T */
     template <typename T>
@@ -190,6 +205,8 @@ private:
 
     /** Callback called when the timer expires. */
     static void timer_timeout_callback(void *context);
-    static void timer_timeout_callback_parallel(void *context);
-    static void timer_timeout_callback_sequential(void *context);
+
+    /** Delegate callbacks depending on configuration. */
+    void timer_timeout_callback_parallel();
+    void timer_timeout_callback_sequential();
 };

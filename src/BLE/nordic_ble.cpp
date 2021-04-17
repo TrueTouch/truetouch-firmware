@@ -344,6 +344,11 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
 
     if (p_evt->type == BLE_NUS_EVT_RX_DATA)
     {
+#ifdef BENCHMARK_TIMING
+        /* Set pin high from when we get data to when we finish handling it. */
+        nrf_gpio_pin_set(FEATHER_SDA_PIN);
+#endif
+
         uint32_t err_code;
 
         NRF_LOG_DEBUG("Received data from BLE NUS:");
