@@ -1,63 +1,23 @@
-/**
- * Copyright (c) 2014 - 2020, Nordic Semiconductor ASA
+/*
+ * main.cpp
  *
- * All rights reserved.
+ * Main program for the TrueTouch device.
  *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form, except as embedded into a Nordic
- *    Semiconductor ASA integrated circuit in a product or a software update for
- *    such product, must reproduce the above copyright notice, this list of
- *    conditions and the following disclaimer in the documentation and/or other
- *    materials provided with the distribution.
- *
- * 3. Neither the name of Nordic Semiconductor ASA nor the names of its
- *    contributors may be used to endorse or promote products derived from this
- *    software without specific prior written permission.
- *
- * 4. This software, with or without modification, must only be used with a
- *    Nordic Semiconductor ASA integrated circuit.
- *
- * 5. Any software provided in binary form under this license must not be reverse
- *    engineered, decompiled, modified and/or disassembled.
- *
- * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NORDIC SEMICONDUCTOR ASA OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- */
-/** @file
- *
- * @defgroup ble_sdk_uart_over_ble_main main.c
- * @{
- * @ingroup  ble_sdk_app_nus_eval
- * @brief    UART over BLE application main file.
- *
- * This file contains the source code for a sample application that uses the Nordic UART service.
- * This application uses the @ref srvlib_conn_params module.
+ * Copyright (c) 2021 TrueTouch
+ * Distributed under the MIT license (see LICENSE or https://opensource.org/licenses/MIT)
  */
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Includes
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "boards_inc.h"
 #include "nordic_ble.hpp"
+#include "truetouch.hpp"
 #include "util.hpp"
 
 #include <app_timer.h>
 #include <app_util_platform.h>
-#include <bsp_btn_ble.h>
 #include <nordic_common.h>
 #include <nrf.h>
 #include <nrf_gpio.h>
@@ -67,30 +27,26 @@
 #include <nrf_log_ctrl.h>
 #include <nrf_log_default_backends.h>
 
+#include <cstddef>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Constants
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 /** Value used as error code on stack dump, can be used to identify stack location on stack
     unwind. */
-constexpr std::uint32_t DEAD_BEEF { 0xDEADBEEF };
+static constexpr std::uint32_t DEAD_BEEF { 0xDEADBEEF };
 
-/**< UART TX buffer size. */
-constexpr std::uint32_t UART_TX_BUF_SIZE { 256 };
-
-/**< UART RX buffer size. */
-constexpr std::uint32_t UART_RX_BUF_SIZE { 256 };
-
-constexpr std::uint32_t SOLENOID_PIN_CNT { 5 };
-constexpr std::uint8_t SOLENOID_PINS[SOLENOID_PIN_CNT] {
-    SOLENOID_THUMB,
-    SOLENOID_INDEX,
-    SOLENOID_MIDDLE,
-    SOLENOID_RING,
-    SOLENOID_PINKY,
-};
+/** Period (ms) for blinking status LED. */
+static constexpr std::uint32_t STATUS_LED_PERIOD_MS { 500 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Functions
+// Private data
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/**< A timer to drive the status LED. */
+APP_TIMER_DEF(g_status_led_timer);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Private Function Prototypes
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**@brief Function for assert macro callback.
@@ -111,129 +67,125 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 
 /**@brief Function for initializing the timer module.
  */
-static void timers_init()
-{
-    ret_code_t err_code = app_timer_init();
-    APP_ERROR_CHECK(err_code);
-}
-
-/**@brief Function for handling events from the BSP module.
- *
- * @param[in]   event   Event generated by button press.
- */
-void bsp_event_handler(bsp_event_t event)
-{
-    uint32_t err_code;
-    switch (event)
-    {
-        case BSP_EVENT_SLEEP:
-            util::sleep_mode_enter();
-            break;
-
-        case BSP_EVENT_DISCONNECT:
-            ble::disconnect();
-            break;
-
-        case BSP_EVENT_WHITELIST_OFF:
-            ble::advertise_no_whitelist();
-            break;
-
-        default:
-            break;
-    }
-}
-
-/**@brief Function for initializing buttons and leds.
- *
- * @param[out] p_erase_bonds  Will be true if the clear bonding button was pressed to wake the application up.
- */
-static void buttons_leds_init(bool * p_erase_bonds)
-{
-    bsp_event_t startup_event;
-
-    uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = bsp_btn_ble_init(NULL, &startup_event);
-    APP_ERROR_CHECK(err_code);
-
-    *p_erase_bonds = (startup_event == BSP_EVENT_CLEAR_BONDING_DATA);
-}
+static void timers_init();
 
 /**@brief Function for initializing the nrf log module.
  */
-static void log_init()
+static void log_init();
+
+/**@brief Function for initializing power management.
+ */
+static void power_management_init();
+
+/**@brief Function for handling the idle state (main loop).
+ *
+ * @details If there is no pending log operation, then sleep until next the next event occurs.
+ */
+static void idle_state_handle();
+
+/**
+ * BLE event callback for updating the status LED.
+ */
+static void ble_event_callback(ble_evt_t const *ble_evt);
+
+/**
+ * Callback for toggling the status LED.
+ */
+static void led_timer_handler(void *p_context);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Main
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**@brief Application main function.
+ */
+int main()
 {
+    // Initialize.
+    log_init();
+    timers_init();
+    power_management_init();
+
+    /* Config status LED as output. */
+    nrf_gpio_cfg_output(STATUS_LED_PIN);
+    nrf_gpio_pin_clear(STATUS_LED_PIN);
+
+    ble::init(ble_event_callback);
+
+    /* CTOR registers BLE callback and configures solenoid/ERM pins */
+    TrueTouch truetouch {};
+
+    // Start execution.
+    NRF_LOG_INFO("Debug logging started.");
+    ble::advertise();
+
+    /* Start status LED toggle timer (toggle while advertising). */
+    APP_ERROR_CHECK(
+        app_timer_start(g_status_led_timer, APP_TIMER_TICKS(STATUS_LED_PERIOD_MS), nullptr));
+
+    // Enter main loop.
+    for (;;)
+    {
+        idle_state_handle();
+        truetouch.service();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Private Function Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static void timers_init() {
+    ret_code_t err_code = app_timer_init();
+
+    err_code = app_timer_create(&g_status_led_timer,
+                            APP_TIMER_MODE_REPEATED,
+                            led_timer_handler);
+
+    APP_ERROR_CHECK(err_code);
+}
+
+static void log_init() {
     ret_code_t err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
-/**@brief Function for initializing power management.
- */
-static void power_management_init()
-{
+static void power_management_init() {
     ret_code_t err_code;
     err_code = nrf_pwr_mgmt_init();
     APP_ERROR_CHECK(err_code);
 }
 
-/**@brief Function for handling the idle state (main loop).
- *
- * @details If there is no pending log operation, then sleep until next the next event occurs.
- */
-static void idle_state_handle()
-{
+static void idle_state_handle() {
     if (NRF_LOG_PROCESS() == false)
     {
         nrf_pwr_mgmt_run();
     }
 }
 
-/**@brief Initialize GPIO outputs to solenoids.
- */
-static void init_solenoid_gpio()
-{
-    for (std::size_t i = 0; i < SOLENOID_PIN_CNT; ++i) {
-        nrf_gpio_cfg_output(SOLENOID_PINS[i]);
-    }
-}
-
-/* NOTE: following functions available for manipulating GPIO:
- * nrf_gpio_pin_set(uint32_t pin_number);
- * nrf_gpio_pin_clear(uint32_t pin_number);
- * nrf_gpio_pin_toggle(uint32_t pin_number);
- * nrf_gpio_pin_write(uint32_t pin_number, uint32_t value);
- */
-
-/**@brief Application main function.
- */
-int main(void)
-{
-    bool erase_bonds;
-
-    // Initialize.
-    log_init();
-    timers_init();
-    buttons_leds_init(&erase_bonds);
-    init_solenoid_gpio();
-    power_management_init();
-    ble::init();
-
-    // Start execution.
-    printf("\r\nUART started.\r\n");
-    NRF_LOG_INFO("Debug logging over UART started.");
-    ble::advertise();
-
-    // Enter main loop.
-    for (;;)
+static void ble_event_callback(ble_evt_t const *ble_evt) {
+    switch (ble_evt->header.evt_id)
     {
-        idle_state_handle();
+        /** Connected: solid status LED */
+        case BLE_GAP_EVT_CONNECTED:
+            APP_ERROR_CHECK(app_timer_stop(g_status_led_timer));
+            nrf_gpio_pin_set(STATUS_LED_PIN);
+            break;
+
+        /** Disconnected (device will restart advertising): toggling status LED. */
+        case BLE_GAP_EVT_DISCONNECTED:
+            APP_ERROR_CHECK(app_timer_start(
+                g_status_led_timer, APP_TIMER_TICKS(STATUS_LED_PERIOD_MS), nullptr));
+            break;
+
+        default:
+            // No implementation needed.
+            break;
     }
 }
 
-
-/**
- * @}
- */
+static void led_timer_handler(void *p_context) {
+    nrf_gpio_pin_toggle(STATUS_LED_PIN);
+}

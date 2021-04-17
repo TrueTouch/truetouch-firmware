@@ -20,6 +20,8 @@
 #include <nrf_log.h>
 #include <nrf_sdh.h>
 
+#include <cstddef>
+
 namespace ble {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,16 +39,24 @@ NRF_BLE_QWR_DEF(m_qwr);
 /** Advertising module instance. */
 BLE_ADVERTISING_DEF(m_advertising);
 
-/**< Handle of the current connection. */
+/** Handle of the current connection. */
 static std::uint16_t m_conn_handle { BLE_CONN_HANDLE_INVALID };
 
-/**< Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
+/** Maximum length of data (in bytes) that can be transmitted to the peer by the Nordic UART service module. */
 static std::uint16_t m_ble_nus_max_data_len { BLE_GATT_ATT_MTU_DEFAULT - 3 };
 
-/**< Universally unique service identifier. */
+/** Universally unique service identifier. */
 static ble_uuid_t m_adv_uuids[] {
     {BLE_UUID_NUS_SERVICE, NUS_SERVICE_UUID_TYPE}
 };
+
+/** BLE events callback. */
+EventCallback m_event_callback;
+
+/** BLE write event callbacks and contexts. */
+static std::uint32_t m_callback_cnt {};
+static UartCallback m_callbacks[CALLBACK_MAX] {};
+static void *m_contexts[CALLBACK_MAX] {};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private function prototypes
@@ -144,8 +154,10 @@ void gatt_evt_handler(nrf_ble_gatt_t * p_gatt, nrf_ble_gatt_evt_t const * p_evt)
 // Public implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void init()
+void init(EventCallback callback)
 {
+    m_event_callback = callback;
+
     ble_stack_init();
     gap_params_init();
     gatt_init();
@@ -196,6 +208,15 @@ void send(std::uint8_t *data, std::uint16_t length)
             APP_ERROR_CHECK(err_code);
         }
     } while (err_code == NRF_ERROR_RESOURCES);
+}
+
+void register_callback(void *context, UartCallback callback)
+{
+    if (m_callback_cnt < CALLBACK_MAX) {
+       m_callbacks[m_callback_cnt] = callback;
+       m_contexts[m_callback_cnt] = context;
+       ++m_callback_cnt;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -291,12 +312,12 @@ static void gatt_init()
 static void advertising_init()
 {
     ble_advertising_init_t init {};
-    init.advdata.name_type          = BLE_ADVDATA_FULL_NAME;
     init.advdata.include_appearance = false;
     init.advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE;
+    init.advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
+    init.advdata.uuids_complete.p_uuids  = m_adv_uuids;
 
-    init.srdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
-    init.srdata.uuids_complete.p_uuids  = m_adv_uuids;
+    init.srdata.name_type           = BLE_ADVDATA_FULL_NAME;
 
     init.config.ble_adv_fast_enabled  = true;
     init.config.ble_adv_fast_interval = ADV_INTERVAL;
@@ -318,7 +339,6 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
     APP_ERROR_HANDLER(nrf_error);
 }
 
-// TODO: implement haptic glove control protocol here
 static void nus_data_handler(ble_nus_evt_t * p_evt)
 {
 
@@ -326,8 +346,12 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
     {
         uint32_t err_code;
 
-        NRF_LOG_DEBUG("Received data from BLE NUS. Writing data on UART.");
+        NRF_LOG_DEBUG("Received data from BLE NUS:");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+
+        for (std::size_t i = 0; i < m_callback_cnt; ++i) {
+            m_callbacks[i](m_contexts[i], p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
+        }
     }
 }
 
@@ -382,7 +406,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("Disconnected");
-            // LED indication will be changed when advertising starts.
+            /** Automatically restarts advertising. */
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
 
@@ -427,6 +451,10 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
         default:
             // No implementation needed.
             break;
+    }
+
+    if (m_event_callback) {
+        m_event_callback(p_ble_evt);
     }
 }
 

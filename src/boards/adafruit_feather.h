@@ -105,6 +105,9 @@
 // TrueTouch Definitions
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/* Status LED */
+#define STATUS_LED_PIN          LED_2
+
 /* ERM PWM pins (1 per finger + palm) */
 #define ERM_THUMB               FEATHER_D5_PIN
 #define ERM_INDEX               FEATHER_D6_PIN
@@ -119,3 +122,15 @@
 #define SOLENOID_MIDDLE         FEATHER_A2_PIN
 #define SOLENOID_RING           FEATHER_A3_PIN
 #define SOLENOID_PINKY          FEATHER_A4_PIN
+
+/* Set true so PWM is inverted (i.e. runs high until
+   it hits the top value then goes low) - so, a duty cycle of 255 is always on,
+   0 is always off. */
+#define TRUETOUCH_INVERT_PWM    true
+
+/* Set true so pulsing happens in parallel (all pins on then all pins off) instead of
+   sequentially. */
+#define TRUETOUCH_PULSE_PARALLEL    true
+
+/* Set true to use the UART logger backend, otherwise RTT will be used. */
+#define TRUETOUCH_USE_SERIAL        true
