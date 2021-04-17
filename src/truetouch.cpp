@@ -200,6 +200,7 @@ void TrueTouch::handle_solenoid_pulse_sequential() {
     if (_current_pulse_bit == NO_ACTIVE_BIT) {
         _current_pulse_bit = util::get_highest_bit(_pulse_pin_bitset);
     }
+    util::clear_bit(_pulse_pin_bitset, _current_pulse_bit);
     auto pin = finger_to_solenoid_pin(_current_pulse_bit);
 
     NRF_LOG_DEBUG("Pulsing pin %d for %d", pin, _pulse_dur_ms);
@@ -273,8 +274,8 @@ void TrueTouch::timer_timeout_callback(void *context)
 {
     auto *_this = reinterpret_cast<TrueTouch *>(context);
 
-    if (!_this->_pulse_pin_bitset) {
-        NRF_LOG_WARNING("Timer timed out with no pins to pulse!");
+    if (!_this->_pulse_pin_bitset && (_this->_current_pulse_bit == NO_ACTIVE_BIT)) {
+        NRF_LOG_WARNING("Timer timed out with active pins pulsing!");
         return;
     }
 
@@ -303,7 +304,6 @@ void TrueTouch::timer_timeout_callback_sequential() {
     /* Turn off the current pin and shift the queue. */
     auto pin = finger_to_solenoid_pin(_current_pulse_bit);
     nrf_gpio_pin_clear(pin);
-    util::clear_bit(_pulse_pin_bitset, _current_pulse_bit);
 
     /* Stop if no more pins to pulse */
     if (!_pulse_pin_bitset) {
@@ -314,7 +314,11 @@ void TrueTouch::timer_timeout_callback_sequential() {
 
     /* Start the next pin */
     _current_pulse_bit = util::get_highest_bit(_pulse_pin_bitset);
+    util::clear_bit(_pulse_pin_bitset, _current_pulse_bit);
     pin = finger_to_solenoid_pin(_current_pulse_bit);
+
+    NRF_LOG_DEBUG("Pulsing pin %d for %d", pin, _pulse_dur_ms);
+
     nrf_gpio_pin_set(pin);
     APP_ERROR_CHECK(app_timer_start(_timer, APP_TIMER_TICKS(_pulse_dur_ms), this));
 }
