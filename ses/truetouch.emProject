@@ -158,7 +158,7 @@
     link_time_optimization="No" />
   <configuration
     Name="nRF52840_Debug"
-    c_preprocessor_definitions="DEBUG; DEBUG_NRF"
+    c_preprocessor_definitions="DEBUG;DEBUG_NRF;BENCHMARK_TIMING"
     gcc_optimization_level="None"
     inherited_configurations="nRF52840" />
   <configuration
